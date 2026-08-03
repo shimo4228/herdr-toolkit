@@ -1,0 +1,14 @@
+{
+  "name": "herdr-toolkit",
+  "owner": {
+    "name": "shimo4228"
+  },
+  "description": "Self-owned marketplace for the herdr-toolkit plugin. Canonical sources stay in the author's repositories; this marketplace only points at them.",
+  "plugins": [
+    {
+      "name": "herdr-toolkit",
+      "source": "./",
+      "description": "Two operating skills for Claude Code on Herdr: cross-vendor task delegation with acceptance discipline (herdr-delegate) and phone-driven detached session spawning (spawn-session)."
+    }
+  ]
+}

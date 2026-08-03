@@ -1,0 +1,26 @@
+# herdr-toolkit
+
+> Claude Code plugin with two operating skills for running Claude Code on top of Herdr, the terminal agent multiplexer: cross-vendor task delegation with a fabrication-resistant acceptance discipline (herdr-delegate), and phone-driven spawning of detached Remote Control sessions for any project directory (spawn-session).
+
+## Core documentation
+
+- [Full AI Reference](llms-full.txt): self-contained facts, Q&A, and failure-mode catalog for this plugin
+- [README](README.md): human-facing narrative (English)
+- [README 日本語](README.ja.md): human-facing narrative (Japanese)
+- [CHANGELOG](CHANGELOG.md): release history
+
+## Skills
+
+- [herdr-delegate](skills/herdr-delegate/SKILL.md): delegate implementation work to a Codex (or other CLI agent) session in a Herdr pane, with screen-based completion monitoring and git-ground-truth acceptance
+- [spawn-session](skills/spawn-session/SKILL.md): spawn a named, detached Claude Code Remote Control session for any project directory; includes spawn.sh
+
+## Plugin manifests
+
+- [plugin.json](.claude-plugin/plugin.json): Claude Code plugin manifest (v1.0.0, MIT)
+- [marketplace.json](.claude-plugin/marketplace.json): self-owned marketplace pointing at this repo
+
+## Related
+
+- [Herdr](https://github.com/ogulcancelik/herdr): the upstream terminal agent multiplexer (Apache-2.0, by ogulcancelik); installs the herdr CLI skill itself
+- [claude-harness](https://github.com/shimo4228/claude-harness): the author's aggregate harness export, where these skills also appear
+- [akc-cycle](https://github.com/shimo4228/akc-cycle): the author's other Claude Code plugin, same packaging pattern

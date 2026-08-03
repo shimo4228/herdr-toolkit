@@ -1,0 +1,20 @@
+{
+  "name": "herdr-toolkit",
+  "description": "Operating skills for running Claude Code on top of the Herdr agent multiplexer — delegate implementation work to a cross-vendor CLI agent (Codex etc.) with a fabrication-resistant acceptance discipline, and spawn detached Remote Control sessions for other projects from your phone. The herdr CLI skill itself is not bundled: Herdr installs it as part of its own Claude Code integration. The always-loaded delegation-gate rule is not part of the plugin; copy it into your rules directory separately.",
+  "version": "1.0.0",
+  "author": {
+    "name": "shimo4228",
+    "url": "https://github.com/shimo4228"
+  },
+  "homepage": "https://github.com/shimo4228/herdr-toolkit",
+  "repository": "https://github.com/shimo4228/herdr-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "herdr",
+    "agent-multiplexer",
+    "delegation",
+    "remote-control",
+    "codex",
+    "claude-code"
+  ]
+}

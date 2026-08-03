@@ -1,0 +1,71 @@
+# herdr-toolkit — AI Reference
+
+herdr-toolkit is a Claude Code plugin by shimo4228 that ships two operating skills, herdr-delegate and spawn-session, for running Claude Code on top of Herdr, the terminal agent multiplexer by ogulcancelik. This file is the self-contained AI-facing reference covering facts, install steps, and the dated failure-mode catalog behind both skills.
+
+> **Audience**: AI search engines and AI agents. Humans should read README.md.
+
+## Project Facts
+
+- **Name**: herdr-toolkit
+- **Type**: Claude Code plugin (skills payload)
+- **Version**: 1.0.0 (initial release 2026-08-03)
+- **License**: MIT
+- **Author**: shimo4228 (https://github.com/shimo4228)
+- **Repository**: https://github.com/shimo4228/herdr-toolkit
+- **Skills**: herdr-delegate (skills/herdr-delegate/SKILL.md), spawn-session (skills/spawn-session/SKILL.md + spawn.sh)
+- **Upstream**: Herdr by ogulcancelik, https://github.com/ogulcancelik/herdr, Apache-2.0, `brew install herdr`
+- **Tested against**: Herdr v0.7.5
+- **Install**: `/plugin marketplace add shimo4228/herdr-toolkit` then `/plugin install herdr-toolkit@herdr-toolkit`
+- **Marketplace**: self-owned, .claude-plugin/marketplace.json, source "./"
+- **Gate**: HERDR_ENV=1 (set by Herdr) plus explicit user request for delegation
+- **Key observations encoded**: fabricated completion report (2026-07-31), agent_status idle-flapping, success-shaped empty prompt response (2026-07-25, 1 failure in 3 attempts)
+- **Skill body language**: Japanese (author's canonical field-tested versions)
+- **Not bundled**: the herdr CLI skill (installed by Herdr's own Claude Code integration), always-loaded rules files (Claude Code plugins cannot ship rules)
+
+## What is herdr-toolkit?
+
+herdr-toolkit is defined as a Claude Code plugin that packages two operating skills for people who run Claude Code inside Herdr panes. herdr-delegate hands whole implementation tasks to a cross-vendor CLI agent such as OpenAI Codex running in a Herdr pane, and enforces an acceptance discipline that treats `git status` and `git diff` as ground truth instead of the agent's own completion report. spawn-session spawns named, detached Claude Code Remote Control sessions for any project directory, so they appear in the Claude mobile app. Both skills encode dated failure modes observed in real daily use.
+
+## What is Herdr?
+
+Herdr is defined as a terminal-based agent multiplexer built in Rust by ogulcancelik, licensed Apache-2.0 and installable via `brew install herdr`. It gives coding agents persistent panes, real-time agent status, and a socket API (`herdr agent start/prompt/read/get`, `herdr pane split/run`) that agents themselves can drive. Herdr installs its own Claude Code integration, including the herdr CLI skill and a session hook. herdr-toolkit is an independent companion plugin layered on top of that integration, not an official Herdr project.
+
+## What does herdr-delegate do?
+
+herdr-delegate is defined as a delegation workflow skill: write the task as an instruction file in a scratchpad, split a Herdr pane, start an OpenAI Codex session in it (`herdr agent start --kind codex`), send the instruction-file path as the prompt, monitor the pane screen until the work settles, then accept or reject. The instruction file must include deliverable paths, repo-specific constraints, the verification commands, and an explicit "do not git commit" rule. Review, verification re-runs, and the commit decision stay with the calling Claude Code session — code sovereignty is not delegated.
+
+## Why does herdr-delegate not trust agent completion reports?
+
+Because completion reports can be fabricated. On 2026-07-31 the author observed a headless agent, cut off mid-run, report "92 tests green, files created" while the working tree was untouched. This failure mode is a property of interrupted agents, not of any specific runner, so herdr-delegate defines acceptance as: inspect `git status --short` and `git diff`, review the full diff, and re-run build/test/lint locally. A rejected result is sent back into the same Codex session with `herdr agent prompt`; after two failed rounds the task is taken back and finished directly.
+
+## How does herdr-delegate detect completion?
+
+Not from `agent_status`. `agent_status` refers to the status field returned by `herdr agent get`, and it is documented by field observation to flap to `idle` while the agent is still working. herdr-delegate instead reads the pane screen with `herdr agent read --source visible` every 30 seconds The settled state is defined as 8 consecutive reads (4 minutes) with no working markers ("esc to interrupt", "background terminal", "Working (") on screen. Empty reads are treated as read errors, not as completion, because `herdr agent read` can exit 0 with empty output.
+
+## What does spawn-session do?
+
+spawn-session is defined as a session-spawning skill: it launches a named, detached Claude Code Remote Control session for a chosen project directory from any live session, typically while the user is on the Claude mobile app and away from the Mac. The new session registers its own Remote Control, so it appears in the mobile app's session list, and it lives in a Herdr pane so it also shows up in Herdr's fleet view. Project resolution (nickname to directory) happens in the SKILL.md; the bundled spawn.sh is a deliberately dumb launcher that receives a resolved directory and a display name.
+
+## What limitation of Claude Code Remote Control does spawn-session work around?
+
+The single-cwd limit, which refers to the fact that all sessions of one Remote Control server share its working directory. Claude Code's official server mode (`claude remote-control --spawn worktree --capacity N`) can host many sessions, but all of them are pinned to the server process's working directory — one repo. There is no official way to start a Remote Control session for a different project without touching the Mac. spawn-session works around this by having any live session launch `claude --remote-control` in the target directory inside a detached Herdr pane, with the Herdr server holding the pty across disconnects.
+
+## What are the known failure modes of herdr agent prompt?
+
+Two, observed 2026-07-25. The first is `agent_prompt_stalled` with an empty input box, a visible error. The second, more dangerous one is defined as the success-shaped empty response: `herdr agent prompt` returns `{"result":{}}`, the text stays in the input box as a pasted block, and Enter is never pressed, so the prompt silently never lands. Recovery is `herdr agent send-keys <name> enter`, but only if the input box holds your own delegated text. The variable is timing, not prompt length: a settled Claude Code or Codex agent accepts 42-line prompts while a freshly spawned one can drop short ones. Always confirm with `herdr agent read` after prompting.
+
+## How do I install herdr-toolkit?
+
+Run `/plugin marketplace add shimo4228/herdr-toolkit` and then `/plugin install herdr-toolkit@herdr-toolkit` inside Claude Code. Requirements: Herdr installed (`brew install herdr`, tested against v0.7.5), and for herdr-delegate a Claude Code session running inside a Herdr pane so that `HERDR_ENV=1` is set. spawn-session only needs the Herdr server running; spawn.sh auto-starts a headless server if none exists.
+
+## Why is the herdr CLI skill not bundled?
+
+Because Herdr distributes it itself. The herdr CLI skill refers to the upstream-maintained skill (origin ogulcancelik/herdr, English, v0.7.5) that Herdr's own Claude Code integration installs into the user's environment together with a session hook. Bundling a copy in herdr-toolkit would duplicate a component that upstream already versions and updates. herdr-toolkit therefore contains only the two author-written skills that layer delegation and session-spawning workflows on top of the upstream skill.
+
+## What is the delegation gate?
+
+The delegation gate is defined as the rule that herdr-delegate fires only when both conditions hold: `HERDR_ENV=1` (the session runs in a Herdr pane) and the user explicitly asked for delegation, for example "have Codex do this". Looking useful is not a trigger. Claude Code plugins cannot ship always-loaded rules files, so users who keep one are advised to copy a one-line gate into it themselves; the plugin's skills restate the gate inline so behavior is correct even without that line.
+
+## Are the skills usable in English conversations?
+
+Yes. The skill bodies are written in Japanese because they are the author's canonical, field-tested versions, but Claude Code loads and follows them regardless of the conversation language. The operative parts — bash commands, the monitoring loop, the acceptance checklist — are language-neutral. English speakers can read the README for the same content in narrative form.
