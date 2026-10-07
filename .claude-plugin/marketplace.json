@@ -8,7 +8,7 @@
     {
       "name": "herdr-toolkit",
       "source": "./",
-      "description": "Two operating skills for Claude Code on Herdr: cross-vendor task delegation with acceptance discipline (herdr-delegate) and phone-driven detached session spawning (spawn-session)."
+      "description": "One operating skill for Claude Code on Herdr: phone-driven detached session spawning for any project directory (spawn-session)."
     }
   ]
 }

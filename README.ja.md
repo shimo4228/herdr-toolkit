@@ -4,38 +4,35 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-herdr-toolkit は、ターミナル用エージェントマルチプレクサ [Herdr](https://github.com/ogulcancelik/herdr) の上で Claude Code を運用する人向けの Claude Code plugin です。スキルは 2 本: Herdr の pane に立てた別ベンダの CLI エージェント(Codex 等)へ実装タスクを丸ごと委譲するものと、任意のプロジェクトの detached な Remote Control セッションを(多くは Claude モバイルアプリから)立ち上げるものです。
+herdr-toolkit は、ターミナル用エージェントマルチプレクサ [Herdr](https://github.com/ogulcancelik/herdr) の上で Claude Code を運用する人向けの Claude Code plugin です。スキルは `spawn-session` の 1 本で、任意のプロジェクトの detached な Remote Control セッションを(多くは Claude モバイルアプリから)立ち上げます。
 
-どちらもドキュメントからではなく日々の運用から蒸留したスキルで、実測した失敗モードを多くは日付付きで織り込んでいます。中断されたエージェントが完了報告を捏造する、作業中なのに `herdr agent get` の `agent_status` が `idle` を返す、プロンプト送信が成功形のレスポンスのまま実際には届かない、といった類のものです。
+ドキュメントからではなく日々の運用から蒸留したスキルで、実測した失敗モードを多くは日付付きで織り込んでいます。`herdr agent get` の `agent_status` ではプロンプトが届いたか分からない、プロンプト送信が成功形のレスポンスのまま実際には届かない、作業中に送ったプロンプトが黙って落ちる、といった類のものです。
 
 ## Skills
 
 | スキル | 何をするか |
 |---|---|
-| `herdr-delegate` | Herdr の pane の Codex(等の CLI エージェント)セッションに実装タスクを丸ごと渡します。指示書ファイルでの受け渡し、画面ベースの完了監視、そして検収(相手の完了報告を鵜呑みにせず `git status`/`git diff` で実際の変更を確認すること)まで。 |
 | `spawn-session` | 起動中の任意のセッションから、任意のプロジェクトディレクトリ用の名前付き detached Remote Control セッションを立ち上げ、Claude モバイルアプリの一覧に出します。公式 server mode が 1 つの作業ディレクトリに縛られる制約の回避策です。`spawn.sh` 同梱。 |
 
 ```mermaid
 flowchart TD
     P[スマホ: Claude モバイルアプリ] -->|spawn-session| S[新しい detached セッション<br>Herdr の pane 内・任意の repo]
-    C[Claude Code セッション] -->|herdr-delegate| X[Herdr の pane 内の Codex セッション]
-    X -->|working tree の変更| G[検収: git diff + テスト再実行]
 ```
 
-言い換えると: `spawn-session` はスマホ操作中のセッションから別プロジェクトのセッションを増やすためのもの、`herdr-delegate` は Codex の pane に実装させて結果を報告文でなく git で検証するためのものです。
+言い換えると: `spawn-session` はスマホ操作中のセッションから別プロジェクトのセッションを、それぞれ Herdr の pane に増やすためのものです。
 
-## なぜ検収がここまで厳格か
+## なぜ送信のたびに着弾を確かめるか
 
-3 つの実測がスキルの形を決めています。
+立ち上げたセッションに最初の仕事を渡すとき、3 つの実測が効きます。
 
-- 途中で打ち切られた headless エージェントが、working tree 無変更のまま「92 テスト green・ファイル作成済み」と報告しました(2026-07-31 実測)。だから検収は報告を信用せず、`git status` / `git diff` と検証のこちら側での再実行を根拠にします。
-- `herdr agent get` は作業中でも `idle` を返すことがあります。だから完了は画面(「esc to interrupt」表示の消失)で検出し、デバウンスと空読みガードを入れています。
-- `herdr agent prompt` は成功形の空レスポンスで失敗することがあり、テキストが入力欄に残ったまま Enter が入りません(2026-07-25 実測、3 回中 1 回失敗)。だから送信後は必ず `agent read` で着弾を目視します。
+- 起動直後の agent への `herdr agent prompt` は成功形の空レスポンスで失敗することがあり、テキストが入力欄に残ったまま Enter が入りません(2026-07-25 実測、3 回中 1 回失敗)。だから送信後は必ず `agent read` で pane を見て着弾を確かめます。
+- `agent_status` だけでは着弾が分かりません。`done` は「即答して応答待ち」でも返ります。だから判定はステータスでなく画面で行います。
+- `working` 中に送ったプロンプトは黙って落ちます(2026-09-23 実測、3 回)。だから `idle` か `done` を待ってから送ります。
 
 ## 前提
 
 - [Herdr](https://github.com/ogulcancelik/herdr) (`brew install herdr`)。v0.7.5 で検証しています。
-- `herdr-delegate` は Herdr の pane 内で動く Claude Code が前提です(Herdr が設定する `HERDR_ENV=1` をスキルが確認します)。`spawn-session` は Herdr server が動いていれば十分です。
+- `spawn-session` は Herdr server が動いていれば十分です(無ければ `spawn.sh` が headless で起動します)。呼び出し元のセッションが Herdr の pane 内で動いている必要はありません。
 - `herdr` CLI の操作スキル本体はこの plugin に**含まれません**。Herdr 自身が Claude Code integration として導入します。この plugin はその上に載る運用レイヤです。
 
 ## インストール
@@ -45,17 +42,7 @@ flowchart TD
 /plugin install herdr-toolkit@herdr-toolkit
 ```
 
-現行バージョンは v1.0.0 です。内容は [CHANGELOG.md](CHANGELOG.md) を参照してください。
-
-## 委譲ゲート
-
-`herdr-delegate` は「Codex にやらせて」のような明示的な指示があったときだけ発火します。有益そうというだけで自発起動はしません。常駐 rules ファイルを運用しているなら、同じゲートをそちらにも書いておけます:
-
-```markdown
-Herdr 委譲は HERDR_ENV=1 かつユーザーが明示的に求めた場合だけ。
-```
-
-Claude Code plugin は常駐 rule を同梱できない仕様のため、この 1 行はコピーして導入する設計です。
+現行バージョンは v2.0.0 です。内容は [CHANGELOG.md](CHANGELOG.md) を参照してください。
 
 ## 補足
 

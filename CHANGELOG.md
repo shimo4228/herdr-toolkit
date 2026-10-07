@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0 — 2026-10-07
+
+Breaking: the plugin now ships one skill, `spawn-session`.
+
+### Removed
+
+- `skills/herdr-delegate` — its Codex launch flags `--ignore-user-config
+  --ignore-rules` are rejected by interactive codex 0.154 (only `codex exec`
+  accepts them). General pane and agent operations are covered by Herdr's own
+  bundled `herdr` skill; Codex delegation is covered by the official Codex
+  plugin (`codex:rescue`).
+
 ## 1.0.0 — 2026-08-03
 
 Initial release.

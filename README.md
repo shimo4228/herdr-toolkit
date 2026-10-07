@@ -4,40 +4,37 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-herdr-toolkit is a Claude Code plugin for people who run Claude Code on top of [Herdr](https://github.com/ogulcancelik/herdr), the terminal agent multiplexer. It ships two skills: one delegates implementation work to a cross-vendor CLI agent (Codex etc.) in a Herdr pane, and one spawns detached Remote Control sessions for any project directory, typically from the Claude mobile app.
+herdr-toolkit is a Claude Code plugin for people who run Claude Code on top of [Herdr](https://github.com/ogulcancelik/herdr), the terminal agent multiplexer. It ships one skill, `spawn-session`, which spawns detached Remote Control sessions for any project directory, typically from the Claude mobile app.
 
-Both skills are distilled from daily driving, not from the docs. They encode failure modes observed in real runs, most of them dated: agents that fabricate completion reports when interrupted, the `agent_status` field of `herdr agent get` flapping to `idle` mid-work, prompts that silently fail to land with a success-shaped response.
+The skill is distilled from daily driving, not from the docs. It encodes failure modes observed in real runs, most of them dated: the `agent_status` field of `herdr agent get` not telling you whether a prompt landed, prompts that silently fail to land with a success-shaped response, and prompts dropped while the agent is still working.
 
 ## Skills
 
-Skill bodies are written in Japanese (they are the author's canonical, field-tested versions). Claude follows them regardless of your conversation language; the operative commands and monitoring loops are plain bash.
+The skill body is written in Japanese (it is the author's canonical, field-tested version). Claude follows it regardless of your conversation language; the operative commands and monitoring loops are plain bash.
 
 | Skill | What it does |
 |---|---|
-| `herdr-delegate` | Hand a whole implementation task to a Codex (or other CLI agent) session in a Herdr pane: instruction-file handoff, screen-based completion monitoring, and acceptance against `git status`/`git diff` instead of the agent's own report. |
 | `spawn-session` | Spawn a named, detached Claude Code Remote Control session for any project directory from any live session, so it appears in the Claude mobile app. Works around the official server mode being pinned to a single cwd. Includes `spawn.sh`. |
 
 ```mermaid
 flowchart TD
     P[Phone: Claude mobile app] -->|spawn-session| S[New detached Claude Code session<br>in a Herdr pane, any project dir]
-    C[Claude Code session] -->|herdr-delegate| X[Codex session in a Herdr pane]
-    X -->|working tree changes| G[Acceptance: git diff + re-run tests]
 ```
 
-In text: `spawn-session` lets a phone-driven session create new sessions for other projects; `herdr-delegate` lets a Claude Code session run a Codex pane and then verifies the result against git, not against the report.
+In text: `spawn-session` lets a phone-driven session create new sessions for other projects, each in its own Herdr pane.
 
-## Why acceptance is strict
+## Why every prompt is confirmed
 
-Three field observations shape these skills:
+When you hand the new session a first task, three field observations apply:
 
-- A headless agent, cut off mid-run, reported "92 tests green, files created" while the tree was untouched (observed 2026-07-31). So acceptance never trusts the report; ground truth is `git status` / `git diff` plus re-running the verification locally.
-- `herdr agent get` can return `idle` while the agent is still working. So completion is detected from the pane screen (the disappearance of "esc to interrupt"), with debounce and empty-read guards.
-- `herdr agent prompt` can fail with a success-shaped empty response, leaving the text in the input box with Enter never pressed (observed 2026-07-25, 1 failure in 3 attempts). So every prompt is followed by an `agent read` to confirm it landed.
+- `herdr agent prompt` to a freshly spawned agent can fail with a success-shaped empty response, leaving the text in the input box with Enter never pressed (observed 2026-07-25, 1 failure in 3 attempts). So every prompt is followed by an `agent read` of the pane to confirm it landed.
+- `agent_status` alone does not tell you whether a prompt landed: `done` also means "answered and waiting". So the skill confirms on the pane screen, not on the status field.
+- A prompt sent while the agent is `working` is silently dropped (observed 2026-09-23, 3 times). So the skill waits for `idle` or `done` before sending.
 
 ## Requirements
 
 - [Herdr](https://github.com/ogulcancelik/herdr) (`brew install herdr`). Built against v0.7.5.
-- Claude Code running inside a Herdr pane for `herdr-delegate` (the skill checks `HERDR_ENV=1`, which Herdr sets). `spawn-session` only needs the Herdr server running.
+- `spawn-session` only needs the Herdr server running; `spawn.sh` starts a headless one if none exists. The calling session does not have to run inside a Herdr pane.
 - The `herdr` CLI skill itself is **not** bundled here: Herdr installs it into your Claude Code environment as part of its own integration. This plugin layers on top of it.
 
 ## Install
@@ -47,17 +44,7 @@ Three field observations shape these skills:
 /plugin install herdr-toolkit@herdr-toolkit
 ```
 
-Current release: v1.0.0. See [CHANGELOG.md](CHANGELOG.md) for what's in it.
-
-## Delegation gate
-
-`herdr-delegate` fires only when you explicitly ask for delegation ("have Codex do this"). It never self-triggers just because delegation looks useful. If you keep an always-loaded rules file, you can pin the same gate there:
-
-```markdown
-Herdr delegation: only when HERDR_ENV=1 and the user explicitly asks for it.
-```
-
-Claude Code plugins cannot ship always-loaded rules, so this line is copy-install by design.
+Current release: v2.0.0. See [CHANGELOG.md](CHANGELOG.md) for what's in it.
 
 ## Notes
 

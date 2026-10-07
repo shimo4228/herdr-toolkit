@@ -2,8 +2,8 @@
 # sync-from-local.sh — one-way export from the live Claude Code harness
 # (~/.claude) into this repo.
 #
-# herdr-toolkit variant: publishes the fixed plugin payload — the two
-# herdr-operating skills (herdr-delegate, spawn-session) — so this repo
+# herdr-toolkit variant: publishes the fixed plugin payload — the
+# herdr-operating skills (spawn-session) — so this repo
 # doubles as a Claude Code plugin (see .claude-plugin/). Unlike the aggregate
 # claude-harness sync, the published set is an explicit allowlist, not an
 # origin sweep: every listed component must exist in the harness and declare
@@ -27,7 +27,7 @@ ORIGIN="${HARNESS_SYNC_ORIGIN:-shimo4228}"
 TARGET_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # the fixed published set (allowlist), relative to harness root / repo root
-SKILLS=(herdr-delegate spawn-session)
+SKILLS=(spawn-session)
 SUBTREES=(skills)
 
 DRY_RUN=0
@@ -75,7 +75,7 @@ for s in "${SKILLS[@]}"; do cp -R "$SOURCE_DIR/skills/$s" "$STAGING/skills/"; do
 
 # --- prune runtime artifacts from the staged payload ---
 find "$STAGING" \( -name results.json -o -name '*.log' -o -name '*.pyc' \
-  -o -name .DS_Store -o -name .coverage -o -name '.coverage.*' \) -delete
+  -o -name .DS_Store -o -name .coverage -o -name '.coverage.*' -o -name MAINTENANCE.md \) -delete
 find "$STAGING" \( -name __pycache__ -o -name .pytest_cache -o -name .venv \
   -o -name node_modules -o -name .mypy_cache -o -name .ruff_cache \
   -o -name htmlcov \) -type d -prune -exec rm -rf {} + 2>/dev/null || true
