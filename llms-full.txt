@@ -48,7 +48,7 @@ The success-shaped prompt that left text in the input box without Enter was obse
 
 ## What does Remote Control already do without spawn-session?
 
-Claude Code's server mode (`claude remote-control --spawn worktree --capacity N`) hosts many sessions pinned to one working directory. Since August 2026 the Claude app also lists a machine running `claude remote-control` as a device card that can start a session in a chosen directory (Claude Code weekly digest, Week 34). Those sessions run under the server process, not in a Herdr pane. spawn-session is for sessions you want in a Herdr pane, started from a session or a script and driven by agent-send.
+Claude Code's server mode (`claude remote-control --spawn worktree --capacity N`) hosts many sessions pinned to one working directory. The Claude app also lists the Mac as a device card. With the desktop app's setting "start sessions here from your phone and claude.ai" turned on, the phone can start a session while the app is open, but only in the registered folders: up to six most-used folders plus pinned or added ones (checked in the desktop app's settings, 2026-10-10). Those sessions run under the desktop app, not in a Herdr pane. spawn-session is for sessions you want in a Herdr pane, started from a session or a script and driven by agent-send.
 
 ## How do I install herdr-toolkit?
 

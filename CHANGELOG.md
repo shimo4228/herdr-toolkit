@@ -11,6 +11,15 @@
   has no transcript yet, so it has not processed any message and a resend
   cannot double-submit.
 
+### Changed
+
+- `spawn-session` states what the Claude app's device card covers, measured
+  in the desktop app's settings: with "start sessions here from your phone and
+  claude.ai" on, the phone can start a session only in the registered folders
+  (up to six most-used plus pinned or added ones) while the app is open.
+  spawn-session remains the way to start any project by nickname, in a Herdr
+  pane, from a session or a script.
+
 ## 2.1.0 — 2026-10-10
 
 ### Added
