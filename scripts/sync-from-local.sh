@@ -3,7 +3,7 @@
 # (~/.claude) into this repo.
 #
 # herdr-toolkit variant: publishes the fixed plugin payload — the
-# herdr-operating skills (spawn-session) — so this repo
+# herdr-operating skills (spawn-session, agent-send) — so this repo
 # doubles as a Claude Code plugin (see .claude-plugin/). Unlike the aggregate
 # claude-harness sync, the published set is an explicit allowlist, not an
 # origin sweep: every listed component must exist in the harness and declare
@@ -27,7 +27,7 @@ ORIGIN="${HARNESS_SYNC_ORIGIN:-shimo4228}"
 TARGET_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # the fixed published set (allowlist), relative to harness root / repo root
-SKILLS=(spawn-session)
+SKILLS=(spawn-session agent-send)
 SUBTREES=(skills)
 
 DRY_RUN=0

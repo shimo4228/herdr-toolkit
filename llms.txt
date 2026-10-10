@@ -1,6 +1,6 @@
 # herdr-toolkit
 
-> Claude Code plugin with one operating skill for running Claude Code on top of Herdr, the terminal agent multiplexer: phone-driven spawning of detached Remote Control sessions for any project directory (spawn-session).
+> Claude Code plugin with two operating skills for running Claude Code on top of Herdr, the terminal agent multiplexer: spawning detached Remote Control sessions into Herdr panes (spawn-session), and sending prompts to agents in Herdr panes with landing confirmation and a completion wait (agent-send).
 
 ## Core documentation
 
@@ -11,15 +11,22 @@
 
 ## Skills
 
-- [spawn-session](skills/spawn-session/SKILL.md): spawn a named, detached Claude Code Remote Control session for any project directory; includes spawn.sh
+- [spawn-session](skills/spawn-session/SKILL.md): start a named, detached Claude Code Remote Control session for any project directory in its own Herdr pane, with optional model, effort, permission mode and first prompt; includes spawn.sh
+- [agent-send](skills/agent-send/SKILL.md): send a prompt to an agent in a Herdr pane and report whether it landed, or wait until the work is done; includes agent-send.sh
 
 ## Plugin manifests
 
-- [plugin.json](.claude-plugin/plugin.json): Claude Code plugin manifest (v2.0.0, MIT)
+- [plugin.json](.claude-plugin/plugin.json): Claude Code plugin manifest (v2.1.0, MIT)
 - [marketplace.json](.claude-plugin/marketplace.json): self-owned marketplace pointing at this repo
+
+## Design records
+
+- [2.1.0 plan](docs/plans/herdr-toolkit-2-1.html): the plan behind agent-send and the spawn-session changes
+- [Session bottlenecks](docs/plans/research/2026-10-10-herdr-session-bottlenecks.md): counts from 1,704 herdr calls in the author's sessions
+- [External research](docs/plans/research/2026-10-10-herdr-toolkit-next.md): Herdr 0.9.3, Claude Code 2.1.296 and plugin facts as of 2026-10-10
 
 ## Related
 
-- [Herdr](https://github.com/ogulcancelik/herdr): the upstream terminal agent multiplexer (Apache-2.0, by ogulcancelik); installs the herdr CLI skill itself
-- [claude-harness](https://github.com/shimo4228/claude-harness): the author's aggregate harness export, where this skill also appears
+- [Herdr](https://github.com/herdrdev/herdr): the upstream terminal agent multiplexer (Apache-2.0, by ogulcancelik); prints its own herdr CLI skill with `herdr --skill`
+- [claude-harness](https://github.com/shimo4228/claude-harness): the author's aggregate harness export, where these skills also appear
 - [akc-cycle](https://github.com/shimo4228/akc-cycle): the author's other Claude Code plugin, same packaging pattern

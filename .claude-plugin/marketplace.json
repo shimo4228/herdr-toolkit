@@ -8,7 +8,7 @@
     {
       "name": "herdr-toolkit",
       "source": "./",
-      "description": "One operating skill for Claude Code on Herdr: phone-driven detached session spawning for any project directory (spawn-session)."
+      "description": "Two operating skills for Claude Code on Herdr: spawn sessions into Herdr panes (spawn-session) and send prompts with landing confirmation and a completion wait (agent-send)."
     }
   ]
 }
