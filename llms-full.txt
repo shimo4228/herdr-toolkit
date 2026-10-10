@@ -8,19 +8,21 @@ herdr-toolkit is a Claude Code plugin by shimo4228 that ships one operating skil
 
 - **Name**: herdr-toolkit
 - **Type**: Claude Code plugin (skills payload)
-- **Version**: 2.0.0 (2026-10-07; initial release 1.0.0 on 2026-08-03)
+- **Version**: 2.0.0 (2026-10-07; removed the earlier herdr-delegate skill; initial release 1.0.0 on 2026-08-03)
+- **Status**: active, synced one way from the author's live Claude Code setup (`~/.claude`) by `scripts/sync-from-local.sh`
 - **License**: MIT
-- **Author**: shimo4228 (https://github.com/shimo4228)
+- **Author**: shimo4228 (https://github.com/shimo4228; hub: https://github.com/shimo4228/shimo4228)
 - **Repository**: https://github.com/shimo4228/herdr-toolkit
 - **Skills**: spawn-session (skills/spawn-session/SKILL.md + spawn.sh)
 - **Upstream**: Herdr by ogulcancelik, https://github.com/ogulcancelik/herdr, Apache-2.0, `brew install herdr`
-- **Tested against**: Herdr v0.7.5
+- **Built against**: Herdr v0.7.5
 - **Install**: `/plugin marketplace add shimo4228/herdr-toolkit` then `/plugin install herdr-toolkit@herdr-toolkit`
 - **Marketplace**: self-owned, .claude-plugin/marketplace.json, source "./"
-- **Runtime requirement**: a running Herdr server (spawn.sh auto-starts a headless one)
+- **Requirements**: claude.ai subscription (Remote Control does not accept API keys), Herdr, jq, `claude` on the pane shell's PATH, one running Claude Code session to call the skill from; spawn.sh auto-starts a headless Herdr server
+- **Configuration**: `$CC_PROJECTS_ROOT`, the folder that holds your repositories (default `~/MyAI_Lab`)
 - **Key observations encoded**: success-shaped empty prompt response (2026-07-25, 1 failure in 3 attempts), agent_status `done` is not a landing signal, prompts sent while `working` are silently dropped (2026-09-23)
 - **Skill body language**: Japanese (author's canonical field-tested version)
-- **Not bundled**: the herdr CLI skill (installed by Herdr's own Claude Code integration)
+- **Not bundled**: the herdr CLI skill (installed by Herdr's own Claude Code integration; spawn-session does not need it)
 
 ## What is herdr-toolkit?
 
@@ -28,7 +30,7 @@ herdr-toolkit is defined as a Claude Code plugin that packages one operating ski
 
 ## What is Herdr?
 
-Herdr is defined as a terminal-based agent multiplexer built in Rust by ogulcancelik, licensed Apache-2.0 and installable via `brew install herdr`. It gives coding agents persistent panes, real-time agent status, and a socket API (`herdr agent start/prompt/read/get`, `herdr pane split/run`) that agents themselves can drive. Herdr installs its own Claude Code integration, including the herdr CLI skill and a session hook. herdr-toolkit is an independent companion plugin layered on top of that integration, not an official Herdr project.
+Herdr is defined as a terminal-based agent multiplexer built in Rust by ogulcancelik, licensed Apache-2.0 and installable via `brew install herdr`. It gives coding agents persistent panes, real-time agent status, and a socket API (`herdr agent start/prompt/read/get`, `herdr pane split/run`) that agents themselves can drive. Herdr installs its own Claude Code integration, including the herdr CLI skill and a session hook. herdr-toolkit is an independent companion plugin, not an official Herdr project; its spawn.sh calls the `herdr` command directly rather than going through that integration.
 
 ## What does spawn-session do?
 
@@ -36,19 +38,19 @@ spawn-session is defined as a session-spawning skill: it launches a named, detac
 
 ## What limitation of Claude Code Remote Control does spawn-session work around?
 
-The single-cwd limit, which refers to the fact that all sessions of one Remote Control server share its working directory. Claude Code's official server mode (`claude remote-control --spawn worktree --capacity N`) can host many sessions, but all of them are pinned to the server process's working directory — one repo. There is no official way to start a Remote Control session for a different project without touching the Mac. spawn-session works around this by having any live session launch `claude --remote-control` in the target directory inside a detached Herdr pane, with the Herdr server holding the pty across disconnects.
+The single-cwd limit, which refers to the fact that all sessions of one Remote Control server share its working directory. Claude Code's official server mode (`claude remote-control --spawn worktree --capacity N`) can host many sessions, but all of them are pinned to the server process's working directory — one repo. There is no official way to start a Remote Control session for a different project without touching the Mac (both checked against the official docs on 2026-08-01). spawn-session works around this by having any live session launch `claude --remote-control` in the target directory inside a detached Herdr pane, with the Herdr server holding the pty across disconnects.
 
 ## What are the known failure modes of herdr agent prompt?
 
-Three. Two were observed 2026-07-25. The first is `agent_prompt_stalled` with an empty input box, a visible error. The second, more dangerous one is defined as the success-shaped empty response: `herdr agent prompt` returns `{"result":{}}`, the text stays in the input box as a pasted block, and Enter is never pressed, so the prompt silently never lands. Recovery is `herdr agent send-keys <name> enter`, but only if the input box holds your own prompt text, not a human's draft. The variable is timing, not prompt length: a settled Claude Code or Codex agent accepts 42-line prompts while a freshly spawned one can drop short ones. Always confirm with `herdr agent read` after prompting. The third, observed 2026-09-23: a prompt sent while the agent is `working` is silently dropped, so wait for `idle` or `done` before sending.
+Three. Two were observed 2026-07-25. The first is `agent_prompt_stalled` with an empty input box, a visible error. The second, more dangerous one is defined as the success-shaped empty response: `herdr agent prompt` returns `{"result":{}}`, the text stays in the input box as a pasted block, and Enter is never pressed, so the prompt silently never lands. Recovery is `herdr agent send-keys <name> enter`, but only if the input box holds your own prompt text, not a human's draft. The variable is timing, not prompt length: a settled agent accepts 42-line prompts while a freshly spawned one can drop short ones. Always confirm with `herdr agent read` after prompting. The third, observed 2026-09-23: a prompt sent while the agent is `working` is silently dropped, so wait for `idle` or `done` before sending.
 
 ## How do I install herdr-toolkit?
 
-Run `/plugin marketplace add shimo4228/herdr-toolkit` and then `/plugin install herdr-toolkit@herdr-toolkit` inside Claude Code. Requirements: Herdr installed (`brew install herdr`, tested against v0.7.5). spawn-session only needs the Herdr server running; spawn.sh auto-starts a headless server if none exists.
+Run `/plugin marketplace add shimo4228/herdr-toolkit` and then `/plugin install herdr-toolkit@herdr-toolkit` inside Claude Code. Then export `CC_PROJECTS_ROOT` (default `~/MyAI_Lab`) to the folder that holds your repositories, before starting the session that will call the skill. Requirements: Claude Code on a claude.ai subscription (Remote Control does not accept API keys), Herdr (`brew install herdr`, built against v0.7.5), jq, and `claude` on the PATH of the pane shell. spawn.sh auto-starts a headless Herdr server if none exists.
 
 ## Why is the herdr CLI skill not bundled?
 
-Because Herdr distributes it itself. The herdr CLI skill refers to the upstream-maintained skill (origin ogulcancelik/herdr, English, v0.7.5) that Herdr's own Claude Code integration installs into the user's environment together with a session hook. Bundling a copy in herdr-toolkit would duplicate a component that upstream already versions and updates. herdr-toolkit therefore contains only the author-written spawn-session skill, which layers a session-spawning workflow on top of the upstream skill.
+Because Herdr distributes it itself. The herdr CLI skill refers to the upstream-maintained skill (origin ogulcancelik/herdr, English, v0.7.5) that Herdr's own Claude Code integration installs into the user's environment together with a session hook. Bundling a copy in herdr-toolkit would duplicate a component that upstream already versions and updates. herdr-toolkit therefore contains only the author-written spawn-session skill, which does not depend on the upstream skill: spawn.sh calls the `herdr` command directly, so installing Herdr is enough.
 
 ## Is the skill usable in English conversations?
 

@@ -2,12 +2,14 @@
 
 > Claude Code plugin with one operating skill for running Claude Code on top of Herdr, the terminal agent multiplexer: phone-driven spawning of detached Remote Control sessions for any project directory (spawn-session).
 
+Status: active; spawn-session is synced one way from the author's live Claude Code harness (`~/.claude`) by [scripts/sync-from-local.sh](scripts/sync-from-local.sh).
+
 ## Core documentation
 
 - [Full AI Reference](llms-full.txt): self-contained facts, Q&A, and failure-mode catalog for this plugin
 - [README](README.md): human-facing narrative (English)
 - [README 日本語](README.ja.md): human-facing narrative (Japanese)
-- [CHANGELOG](CHANGELOG.md): release history
+- [CHANGELOG](CHANGELOG.md): release history (v2.0.0 removed the earlier herdr-delegate skill)
 
 ## Skills
 
@@ -20,6 +22,8 @@
 
 ## Related
 
-- [Herdr](https://github.com/ogulcancelik/herdr): the upstream terminal agent multiplexer (Apache-2.0, by ogulcancelik); installs the herdr CLI skill itself
+- [Herdr](https://github.com/ogulcancelik/herdr): the upstream terminal agent multiplexer (Apache-2.0, by ogulcancelik); installs its own herdr CLI skill, which spawn-session does not need
 - [claude-harness](https://github.com/shimo4228/claude-harness): the author's aggregate harness export, where this skill also appears
-- [akc-cycle](https://github.com/shimo4228/akc-cycle): the author's other Claude Code plugin, same packaging pattern
+- [akc-cycle](https://github.com/shimo4228/akc-cycle): the author's Claude Code plugin that installs the Agent Knowledge Cycle (audit and upkeep skills plus an optional rules file)
+- [harness-scope](https://github.com/shimo4228/harness-scope): the author's Claude Code Mod that turns global skills, agents, rules and tools on or off per repo with named profiles
+- [shimo4228](https://github.com/shimo4228/shimo4228): the author's hub, with the long-running practice lines and their DOIs
