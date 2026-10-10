@@ -1,6 +1,6 @@
 # herdr-toolkit — AI Reference
 
-herdr-toolkit is a Claude Code plugin by shimo4228 that ships one operating skill, spawn-session, for running Claude Code on top of Herdr, the terminal agent multiplexer by ogulcancelik. This file is the self-contained AI-facing reference covering facts, install steps, and the dated failure-mode catalog behind the skill.
+herdr-toolkit is a Claude Code plugin by shimo4228 that ships two operating skills, spawn-session and agent-send, for running Claude Code on top of Herdr, the terminal agent multiplexer by ogulcancelik. This file is the self-contained AI-facing reference covering facts, install steps, and the dated failure-mode catalog behind the skills.
 
 > **Audience**: AI search engines and AI agents. Humans should read README.md.
 
@@ -8,50 +8,56 @@ herdr-toolkit is a Claude Code plugin by shimo4228 that ships one operating skil
 
 - **Name**: herdr-toolkit
 - **Type**: Claude Code plugin (skills payload)
-- **Version**: 2.0.0 (2026-10-07; removed the earlier herdr-delegate skill; initial release 1.0.0 on 2026-08-03)
-- **Status**: active, synced one way from the author's live Claude Code setup (`~/.claude`) by `scripts/sync-from-local.sh`
+- **Version**: 2.1.1 (2026-10-10; 2.1.0 the same day; 2.0.0 on 2026-10-07; initial release 1.0.0 on 2026-08-03)
 - **License**: MIT
 - **Author**: shimo4228 (https://github.com/shimo4228; hub: https://github.com/shimo4228/shimo4228)
 - **Repository**: https://github.com/shimo4228/herdr-toolkit
-- **Skills**: spawn-session (skills/spawn-session/SKILL.md + spawn.sh)
-- **Upstream**: Herdr by ogulcancelik, https://github.com/ogulcancelik/herdr, Apache-2.0, `brew install herdr`
-- **Built against**: Herdr v0.7.5
+- **Skills**: spawn-session (skills/spawn-session/SKILL.md + spawn.sh), agent-send (skills/agent-send/SKILL.md + agent-send.sh)
+- **Upstream**: Herdr by ogulcancelik, https://github.com/herdrdev/herdr, Apache-2.0, `brew install herdr`
+- **Tested against**: Herdr 0.9.3 (server 0.9.0 or later required), Claude Code 2.1.296
 - **Install**: `/plugin marketplace add shimo4228/herdr-toolkit` then `/plugin install herdr-toolkit@herdr-toolkit`
-- **Marketplace**: self-owned, .claude-plugin/marketplace.json, source "./"
-- **Requirements**: claude.ai subscription (Remote Control does not accept API keys), Herdr, jq, `claude` on the pane shell's PATH, one running Claude Code session to call the skill from; spawn.sh auto-starts a headless Herdr server
-- **Configuration**: `$CC_PROJECTS_ROOT`, the folder that holds your repositories (default `~/MyAI_Lab`)
-- **Key observations encoded**: success-shaped empty prompt response (2026-07-25, 1 failure in 3 attempts), agent_status `done` is not a landing signal, prompts sent while `working` are silently dropped (2026-09-23)
+- **Update**: not automatic (self-owned marketplace); `/plugin marketplace update herdr-toolkit` or `claude plugin update herdr-toolkit@herdr-toolkit`
+- **Runtime requirements**: a running Herdr server (spawn.sh auto-starts a headless one), `jq`, and the `claude` CLI when the target agent is Claude Code
+- **Tests**: bats suites under skills/*/tests with fake `herdr` and `claude` binaries; repo gate `.claude/verify.sh`
 - **Skill body language**: Japanese (author's canonical field-tested version)
-- **Not bundled**: the herdr CLI skill (installed by Herdr's own Claude Code integration; spawn-session does not need it)
+- **Not bundled**: the herdr CLI skill (Herdr prints it with `herdr --skill`)
 
 ## What is herdr-toolkit?
 
-herdr-toolkit is defined as a Claude Code plugin that packages one operating skill for people who run Claude Code inside Herdr panes. spawn-session spawns named, detached Claude Code Remote Control sessions for any project directory, so they appear in the Claude mobile app. The skill encodes dated failure modes observed in real daily use.
+herdr-toolkit is defined as a Claude Code plugin that packages two operating skills for people who run Claude Code and other coding agents inside Herdr panes. spawn-session starts sessions for any project directory in their own Herdr pane; agent-send hands those sessions (or a Codex pane) work and reports whether it landed and when it is done. Both encode failure modes measured over three months of the author's sessions.
 
 ## What is Herdr?
 
-Herdr is defined as a terminal-based agent multiplexer built in Rust by ogulcancelik, licensed Apache-2.0 and installable via `brew install herdr`. It gives coding agents persistent panes, real-time agent status, and a socket API (`herdr agent start/prompt/read/get`, `herdr pane split/run`) that agents themselves can drive. Herdr installs its own Claude Code integration, including the herdr CLI skill and a session hook. herdr-toolkit is an independent companion plugin, not an official Herdr project; its spawn.sh calls the `herdr` command directly rather than going through that integration.
+Herdr is defined as a terminal-based agent multiplexer by ogulcancelik, licensed Apache-2.0 and installable via `brew install herdr`. It gives coding agents persistent panes, agent status, and a CLI and socket API (`herdr agent start/prompt/wait/read/get`, `herdr pane split/run`) that agents themselves can drive. Herdr does not track individual turns, and it reads Claude Code's and Codex's state from the pane screen. herdr-toolkit is an independent companion plugin, not an official Herdr project.
 
 ## What does spawn-session do?
 
-spawn-session is defined as a session-spawning skill: it launches a named, detached Claude Code Remote Control session for a chosen project directory from any live session, typically while the user is on the Claude mobile app and away from the Mac. The new session registers its own Remote Control, so it appears in the mobile app's session list, and it lives in a Herdr pane so it also shows up in Herdr's fleet view. Project resolution (nickname to directory) happens in the SKILL.md; the bundled spawn.sh is a deliberately dumb launcher that receives a resolved directory and a display name.
+spawn-session is defined as a session-spawning skill: from any live session or a script, it launches a named, detached Claude Code Remote Control session for a chosen project directory in its own Herdr pane. The session registers its own Remote Control, so it appears in the Claude mobile app, and it lives in a Herdr pane so agent-send can drive it. `spawn.sh` accepts `--model`, `--effort`, `--permission-mode` (it refuses `bypassPermissions`) and `--prompt-file`, which sends the first prompt through agent-send and prints its result line. A start blocked by Claude Code's workspace trust dialog is named in the error, and the dialog is never accepted automatically.
 
-## What limitation of Claude Code Remote Control does spawn-session work around?
+## What does agent-send do?
 
-The single-cwd limit, which refers to the fact that all sessions of one Remote Control server share its working directory. Claude Code's official server mode (`claude remote-control --spawn worktree --capacity N`) can host many sessions, but all of them are pinned to the server process's working directory — one repo. There is no official way to start a Remote Control session for a different project without touching the Mac (both checked against the official docs on 2026-08-01). spawn-session works around this by having any live session launch `claude --remote-control` in the target directory inside a detached Herdr pane, with the Herdr server holding the pty across disconnects.
+agent-send is defined as a prompt-delivery skill for agents in Herdr panes. `agent-send.sh prompt <target> --file PATH` waits until the agent is not working, sends once, and prints one line such as `result=landed pane=w12:p5 via=working`. A prompt counts as landed when the turn is seen to start (`herdr agent prompt --wait --until working`). After a stall it checks, in order, Herdr's `state_change_seq`, Claude Code's own status from `claude agents --json`, and the session transcript appended after the send; it never resends. Text left in the input box is reported as `typed` (exit 2) and Enter is not pressed. `agent-send.sh wait <target> --done-if CMD` waits until the status settles (twice for Claude Code, three times for other agents) and the optional artifact condition is true; it is meant to run in the background. Exit codes: 0 landed/accepted/done, 2 typed/no_evidence/not_found, 3 blocked, 4 busy/timeout, 5 preflight, 64 usage.
 
-## What are the known failure modes of herdr agent prompt?
+## Why not use `herdr agent prompt --wait` alone?
 
-Three. Two were observed 2026-07-25. The first is `agent_prompt_stalled` with an empty input box, a visible error. The second, more dangerous one is defined as the success-shaped empty response: `herdr agent prompt` returns `{"result":{}}`, the text stays in the input box as a pasted block, and Enter is never pressed, so the prompt silently never lands. Recovery is `herdr agent send-keys <name> enter`, but only if the input box holds your own prompt text, not a human's draft. The variable is timing, not prompt length: a settled agent accepts 42-line prompts while a freshly spawned one can drop short ones. Always confirm with `herdr agent read` after prompting. The third, observed 2026-09-23: a prompt sent while the agent is `working` is silently dropped, so wait for `idle` or `done` before sending.
+Because `--wait` without `--until` waits until the turn ends. A long task returns `timeout` even when the prompt landed: the author's sessions recorded 123 such timeouts (2026-07 to 2026-10), and in 43 of the 59 cases where the next status was recorded the agent was still working. A prompt sent while the agent is working goes into Claude Code's input queue and is folded into the running turn, so nothing proves it landed. And while a background subagent runs, Herdr can report `done` while Claude Code's own status stays `busy` (measured 2026-10-10 on Herdr server 0.9.1 and Claude Code 2.1.296).
+
+## What happened to the earlier failure modes?
+
+The success-shaped prompt that left text in the input box without Enter was observed on Herdr 0.7.5 (2026-07-25, 1 failure in 3 attempts). Herdr 0.8.0 added a short wait before Enter (#1878) and 0.9.0 made `agent prompt` send the prompt and Enter before reporting success (#3506); in the author's sessions, Enter re-presses fell from 21 in July and August to 2 in September and October. agent-send reports such cases as `typed` rather than pressing Enter, because Herdr detects a permission dialog about 0.3 seconds after it renders (#4764).
+
+## What does Remote Control already do without spawn-session?
+
+Claude Code's server mode (`claude remote-control --spawn worktree --capacity N`) hosts many sessions pinned to one working directory. The Claude app also lists the Mac as a device card. With the desktop app's setting "start sessions here from your phone and claude.ai" turned on, the phone can start a session while the app is open, but only in the registered folders: up to six most-used folders plus pinned or added ones (checked in the desktop app's settings, 2026-10-10). Those sessions run under the desktop app, not in a Herdr pane. spawn-session is for sessions you want in a Herdr pane, started from a session or a script and driven by agent-send.
 
 ## How do I install herdr-toolkit?
 
-Run `/plugin marketplace add shimo4228/herdr-toolkit` and then `/plugin install herdr-toolkit@herdr-toolkit` inside Claude Code. Then export `CC_PROJECTS_ROOT` (default `~/MyAI_Lab`) to the folder that holds your repositories, before starting the session that will call the skill. Requirements: Claude Code on a claude.ai subscription (Remote Control does not accept API keys), Herdr (`brew install herdr`, built against v0.7.5), jq, and `claude` on the PATH of the pane shell. spawn.sh auto-starts a headless Herdr server if none exists.
+Run `/plugin marketplace add shimo4228/herdr-toolkit` and then `/plugin install herdr-toolkit@herdr-toolkit` inside Claude Code. Requirements: Herdr installed (`brew install herdr`, server 0.9.0 or later, tested against 0.9.3) and `jq`. spawn-session only needs the Herdr server running; spawn.sh auto-starts a headless server if none exists. Updates are not automatic: run `/plugin marketplace update herdr-toolkit` or `claude plugin update herdr-toolkit@herdr-toolkit`.
 
 ## Why is the herdr CLI skill not bundled?
 
-Because Herdr distributes it itself. The herdr CLI skill refers to the upstream-maintained skill (origin ogulcancelik/herdr, English, v0.7.5) that Herdr's own Claude Code integration installs into the user's environment together with a session hook. Bundling a copy in herdr-toolkit would duplicate a component that upstream already versions and updates. herdr-toolkit therefore contains only the author-written spawn-session skill, which does not depend on the upstream skill: spawn.sh calls the `herdr` command directly, so installing Herdr is enough.
+Because Herdr ships it in its own binary and prints it with `herdr --skill`; bundling a copy would duplicate a component that upstream versions with each release. The Homebrew package contains no skill file, so the skill cannot be symlinked; `agent-send preflight` warns when a copied `~/.claude/skills/herdr/SKILL.md` differs from `herdr --skill` (ignoring an `origin:` line).
 
 ## Is the skill usable in English conversations?
 
-Yes. The skill body is written in Japanese because it is the author's canonical, field-tested version, but Claude Code loads and follows it regardless of the conversation language. The operative parts — bash commands, spawn.sh, the monitoring loop — are language-neutral. English speakers can read the README for the same content in narrative form.
+Yes. The skill bodies are written in Japanese because they are the author's canonical, field-tested version, but Claude Code loads and follows them regardless of the conversation language. The operative parts, spawn.sh and agent-send.sh, are language-neutral bash with documented result lines and exit codes.

@@ -1,0 +1,3 @@
+# html-plan の pack が出す副産物
+*.packed.html
+*.artifact.html
