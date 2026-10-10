@@ -19,14 +19,14 @@ origin: shimo4228
 - 既存の会話を続けたい → `claude --continue` / `--resume`
 - 現在のセッションの文脈を消したいだけ → `/clear`
 - 現在のセッションの model / effort 切替 → `/model`, `--effort`
-- **phone から 1 本起こしたいだけで、Herdr pane に置かなくてよい** → Mac で `claude remote-control` を動かしておけば、Claude アプリの Code タブに device card が出て、directory を選んで session を起こせる（公式 digest、2026-08-21。選べる範囲は未確認）。その session は server の子で、Herdr pane には並ばず agent-send も届かない
+- **よく使うフォルダで phone から 1 本起こしたいだけで、Herdr pane に置かなくてよい** → Desktop アプリの Settings > Claude Code の「スマートフォンと claude.ai からここでセッションを開始できるようにする」をオンにすると、アプリが開いている間、Claude アプリの Code タブに Mac の device card が出る。選べるのは登録フォルダ（Claude Code でよく使う 6 個まで + ピン留め・追加したもの）で、任意の directory はたどれない（2026-10-10、Desktop の設定画面で確認）。その session は Desktop アプリの下で動き、Herdr pane には並ばず agent-send も届かない。Desktop が公開中のフォルダでは CLI の `claude remote-control` は起動を拒む
 - **同じ repo で複数セッションが欲しいだけ** → 公式 server mode（`claude remote-control --spawn worktree --capacity N`）で足りる。この skill は要らない
 - **Dispatch で足りる用件** → Cowork タブの Dispatch に投げると、開発作業なら **Code タブのセッション**が起きる（Dispatch バッジ付きでサイドバーに出る）。**`~/.claude` の設定系は読まれる** — personal skills in `~/.claude/skills/` は local session に効き、`~/.claude/settings.json` も Desktop と共有される（設定が claude.ai 同期になるのは **Cowork タブ側**の skills / plugins / connectors であって Code セッションではない）。この skill を使う理由は設定の届き方ではなく、**Desktop アプリが実行主体になり Herdr 艦隊ビューに並ばないこと**と、**起こす repo をこちらが選べないこと**（Dispatch が種別で振り分ける）。Pro/Max 限定で Team/Enterprise では使えない
 - **cloud session**（Claude Code on the web）→ Anthropic 側で実行されるので、ローカル FS / MCP / Herdr と無関係。手元の repo を触らせたいなら対象外
 
 ## How it works
 
-埋めているギャップは **cwd の壁**であって、セッション数の壁ではない（2026-08-01 に公式 docs で確認）。公式 Remote Control には server mode があり `--spawn <same-dir|worktree|session>` / `--capacity <N>`（既定 32）/ `--[no-]create-session-in-dir` で **1 プロセスから複数セッション**を持てる。ただし **server mode の全セッションはその server プロセスの cwd（= 1 repo）に縛られる** — `same-dir` は cwd 共有、`worktree` はその repo の worktree。server mode から別プロジェクトのセッションを起こすには、上の device card が要る。この skill は代わりに、生きている任意のセッションが Bash で別の `claude --remote-control "<名前>"` を、指定した repo の cwd で Herdr の pane 内に detached 起動する。新プロセスが自分の RC を登録し、アプリ一覧に出る。Herdr の persistent session（server）が pty を保持するので、Ghostty/SSH の切断や起動元セッションの終了後も生き残る。server が動いていなければ spawn.sh が headless server を自動起動する（tmux のサーバー自動起動と同等のセマンティクス）。
+埋めているギャップは **cwd の壁**であって、セッション数の壁ではない（2026-08-01 に公式 docs で確認）。公式 Remote Control には server mode があり `--spawn <same-dir|worktree|session>` / `--capacity <N>`（既定 32）/ `--[no-]create-session-in-dir` で **1 プロセスから複数セッション**を持てる。ただし **server mode の全セッションはその server プロセスの cwd（= 1 repo）に縛られる** — `same-dir` は cwd 共有、`worktree` はその repo の worktree。phone から別プロジェクトを起こす公式の道は、上の device card（登録フォルダに限る）。この skill は、登録していないプロジェクトをニックネームから解決し、Herdr の pane に置き、session や script からも起こせる道で、生きている任意のセッションが Bash で別の `claude --remote-control "<名前>"` を、指定した repo の cwd で Herdr の pane 内に detached 起動する。新プロセスが自分の RC を登録し、アプリ一覧に出る。Herdr の persistent session（server）が pty を保持するので、Ghostty/SSH の切断や起動元セッションの終了後も生き残る。server が動いていなければ spawn.sh が headless server を自動起動する（tmux のサーバー自動起動と同等のセマンティクス）。
 
 配置は repo 単位 workspace 運用に合わせる: **同じ repo の workspace が既にあればそこに新 tab、無ければ新 workspace を作成**（workspace label は repo 名、表示名は tab label）。同じ repo かは git の main worktree root で判定するので、linked worktree（`<repo>/.claude/worktrees/<name>` や scratchpad 下）を渡しても repo の workspace に合流し、tab の cwd だけが worktree になる。
 
