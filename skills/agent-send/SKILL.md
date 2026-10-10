@@ -77,7 +77,8 @@ ${CLAUDE_SKILL_DIR}/agent-send.sh wait <target> --timeout 3600000 \
 - 宛先は、この session が起こした pane（spawn-session の出力の `herdr:` 行）か、人間が指名した
   pane に限る。それ以外の session へは送らない — 人間が操作中の会話に割り込むため
 - 送信は Herdr への委譲に当たる。委譲してよい条件は環境の境界 rule が決める（著者の環境では
-  `rules/common/boundary.md`: `HERDR_ENV=1` と明示指示の両方）
+  `rules/common/boundary.md`: 明示指示が要る。spawn-session で自分が起こした pane へは `HERDR_ENV=1`
+  無しで送ってよく、それ以外の pane へは `HERDR_ENV=1` も要る）
 - `herdr`（server 0.9.0 以上）と `jq`
 - 宛先が Claude Code のときは `claude` CLI（状態の読み取りに使う）
 - テスト: `${CLAUDE_SKILL_DIR}/tests/agent-send.bats`（偽の `herdr` / `claude` を `tests/bin/` に置く）
