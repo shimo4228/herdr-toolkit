@@ -29,4 +29,6 @@
 
 - [Herdr](https://github.com/herdrdev/herdr): the upstream terminal agent multiplexer (Apache-2.0, by ogulcancelik); prints its own herdr CLI skill with `herdr --skill`
 - [claude-harness](https://github.com/shimo4228/claude-harness): the author's aggregate harness export, where these skills also appear
-- [akc-cycle](https://github.com/shimo4228/akc-cycle): the author's other Claude Code plugin, same packaging pattern
+- [akc-cycle](https://github.com/shimo4228/akc-cycle): the author's Claude Code plugin that installs the Agent Knowledge Cycle (audit and upkeep skills plus an optional rules file)
+- [harness-scope](https://github.com/shimo4228/harness-scope): the author's Claude Code Mod that turns global skills, agents, rules and tools on or off per repo with named profiles
+- [shimo4228](https://github.com/shimo4228/shimo4228): the author's hub, with the long-running practice lines and their DOIs

@@ -55,6 +55,18 @@ Herdr は turn を追跡せず、agent の状態（working・idle・done・block
 - 正本は著者の稼働中の Claude Code 環境（`~/.claude`）にあり、この repo は `scripts/sync-from-local.sh` による一方向エクスポートです。これは PR を送りたい場合にだけ関係します。取り込んだ変更は正本側に反映されます。
 - Herdr は [ogulcancelik](https://github.com/ogulcancelik) 氏の作（Apache-2.0）です。この plugin は独立したコンパニオンで、upstream とは無関係です。同梱物はすべて著者自作で MIT です。
 
+## 著者のほかの仕事
+
+- **[iPhone公式アプリでClaude Codeを運用する — 新セッション・再認証・git push、3つの穴の塞ぎ方](https://zenn.dev/shimo4228/articles/iphone-claude-code-remote-control)**（[English](https://dev.to/shimo4228/claude-code-from-iphone-plugging-3-holes-in-remote-control-17cf)）: `spawn-session` の出発点です。記事を書いた時点（2026 年 7 月）では既存のセッションにつなぐことしかできなかったスマホアプリから、新しいセッションを立てるための、tmux のワンライナーとして始まった経緯が分かります。
+- **[AI エージェント版 tmux「herdr」— エディタが要らなくなるまで](https://zenn.dev/shimo4228/articles/herdr-agent-multiplexer)**（[English](https://dev.to/shimo4228/herdr-a-tmux-for-ai-agents-until-the-editor-disappeared-3hnn)）: Herdr の上でコーディングエージェントを日々動かす様子と、著者がこの運用を Herdr へ移した理由が分かります。
+- **[claude-harness](https://github.com/shimo4228/claude-harness)**: 著者が毎日使っている Claude Code ハーネスの公開版です。`spawn-session` もここにあり、ほかの skill・subagent・rule・hook と並んでいて、1 つずつ持ち帰れます。
+- **[harness-scope](https://github.com/shimo4228/harness-scope)**: グローバルな skill・agent・rule・tool を、名前付きの profile で repo ごとに on/off する Claude Code Mod（Claude Code 自体の振る舞いを変えるアドオン）です。
+- **[shimo4228](https://github.com/shimo4228/shimo4228)**: 著者のハブです。長期プロジェクトと、その DOI があります。
+
+## ライセンス
+
+[MIT](LICENSE)
+
 <details>
 <summary>ツールと AI アシスタント向けの資料</summary>
 

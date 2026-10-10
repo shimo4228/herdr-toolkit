@@ -55,6 +55,18 @@ Current release: v2.1.1. See [CHANGELOG.md](CHANGELOG.md) for what's in it. This
 - Canonical sources live in the author's live Claude Code setup (`~/.claude`); this repo is a one-way export via `scripts/sync-from-local.sh`. This only matters if you want to send a PR: accepted changes get folded back into the canonical copy.
 - Herdr is by [ogulcancelik](https://github.com/ogulcancelik) (Apache-2.0). This plugin is an independent companion, not affiliated with upstream. Everything here is author-written and MIT.
 
+## More from the author
+
+- **[Claude Code from iPhone: Plugging 3 Holes in Remote Control](https://dev.to/shimo4228/claude-code-from-iphone-plugging-3-holes-in-remote-control-17cf)** ([日本語](https://zenn.dev/shimo4228/articles/iphone-claude-code-remote-control)): where `spawn-session` started, as a tmux one-liner for opening new sessions from the phone app, which could only attach to existing ones when the article was written (July 2026).
+- **[herdr, a tmux for AI Agents — Until the Editor Disappeared](https://dev.to/shimo4228/herdr-a-tmux-for-ai-agents-until-the-editor-disappeared-3hnn)** ([日本語](https://zenn.dev/shimo4228/articles/herdr-agent-multiplexer)): what running coding agents on Herdr looks like day to day, and why the author moved this workflow onto it.
+- **[claude-harness](https://github.com/shimo4228/claude-harness)**: the author's daily-use Claude Code harness, published; `spawn-session` is also there, next to the other skills, subagents, rules and hooks you can lift one at a time.
+- **[harness-scope](https://github.com/shimo4228/harness-scope)**: a Claude Code Mod (an add-on that changes Claude Code's own behaviour) that turns global skills, agents, rules and tools on or off per repo with named profiles.
+- **[shimo4228](https://github.com/shimo4228/shimo4228)**: the author's hub, with the long-running projects and their DOIs.
+
+## License
+
+[MIT](LICENSE)
+
 <details>
 <summary>For tools and AI assistants</summary>
 
