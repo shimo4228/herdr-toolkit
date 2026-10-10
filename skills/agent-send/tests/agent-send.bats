@@ -268,3 +268,28 @@ calls() { grep -c -- "$1" "$FAKE_STATE/calls.log" || true; }
   run "$SCRIPT" prompt w1:p1 --text
   [ "$status" -eq 64 ]
 }
+
+@test "--retry-unseen: transcript がまだ無い新しい session には 1 回だけ送り直す" {
+  printf 'stalled\nok\n' > "$FAKE_STATE/prompt_reply_seq"
+  set_state claude_agents.json '[{"kind":"interactive","sessionId":"sid-1","status":"idle"}]'
+  AGENT_SEND_RETRY_WAIT_S=0 run "$SCRIPT" prompt w1:p1 --text "hello" --retry-unseen
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"via=retry"* ]]
+  [ "$(calls 'agent prompt')" -eq 2 ]
+}
+
+@test "--retry-unseen: transcript があれば送り直さない" {
+  set_state prompt_reply stalled
+  set_state claude_agents.json '[{"kind":"interactive","sessionId":"sid-1","status":"idle"}]'
+  printf '{"type":"user","message":{"content":"earlier"}}\n' > "$CLAUDE_CONFIG_DIR/projects/p/sid-1.jsonl"
+  AGENT_SEND_RETRY_WAIT_S=0 run "$SCRIPT" prompt w1:p1 --text "hello" --retry-unseen
+  [ "$status" -eq 2 ]
+  [ "$(calls 'agent prompt')" -eq 1 ]
+}
+
+@test "--retry-unseen が無ければ送り直さない" {
+  set_state prompt_reply stalled
+  run "$SCRIPT" prompt w1:p1 --text "hello"
+  [ "$status" -eq 2 ]
+  [ "$(calls 'agent prompt')" -eq 1 ]
+}

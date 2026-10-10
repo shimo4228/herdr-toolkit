@@ -200,7 +200,7 @@ if [[ "$start_ok" = 1 ]]; then
   printf '   (claude idle 到達 ✓)\n'
   if [[ -n "$PROMPT_FILE" ]]; then
     rc=0
-    res=$(AGENT_SEND_PREFLIGHT_DONE=1 "$AGENT_SEND" prompt "$PANE_ID" --file "$PROMPT_FILE") || rc=$?
+    res=$(AGENT_SEND_PREFLIGHT_DONE=1 "$AGENT_SEND" prompt "$PANE_ID" --file "$PROMPT_FILE" --retry-unseen) || rc=$?
     printf '   prompt: %s\n' "$res"
     exit "$rc"
   fi

@@ -3,7 +3,7 @@
 # 着弾（turn が始まったこと）と完了を確かめる。
 #
 # Usage:
-#   agent-send.sh prompt <target> (--text TEXT | --file PATH) [--timeout MS] [--busy-timeout MS]
+#   agent-send.sh prompt <target> (--text TEXT | --file PATH) [--timeout MS] [--busy-timeout MS] [--retry-unseen]
 #   agent-send.sh wait   <target> [--timeout MS] [--settle N] [--step MS] [--gap S] [--done-if CMD]
 #   agent-send.sh preflight
 #
@@ -24,6 +24,8 @@ HERDR="${HERDR_BIN:-$(command -v herdr || echo /opt/homebrew/bin/herdr)}"
 CLAUDE="${CLAUDE_BIN:-$(command -v claude || echo claude)}"
 CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 TRANSCRIPT_WAIT_S="${AGENT_SEND_TRANSCRIPT_WAIT_S:-5}"   # transcript は非同期に書かれる
+RETRY_WAIT_S="${AGENT_SEND_RETRY_WAIT_S:-3}"
+RETRY_UNSEEN=0
 MIN_SERVER="0.9.0"
 
 PANE=""
@@ -165,6 +167,7 @@ cmd_prompt() {
               text=$(cat "$2"); have_text=1; shift ;;
       --timeout) num "${2-}"; timeout=$2; shift ;;
       --busy-timeout) num "${2-}"; busy=$2; shift ;;
+      --retry-unseen) RETRY_UNSEEN=1 ;;
       *) usage ;;
     esac
     shift
@@ -219,6 +222,16 @@ confirm_landing() {   # stalled / timeout のあと。本文は再送しない�
   fi
   if transcript_has_text "$pane" "$text" "$offset"; then
     emit landed via=transcript; exit 0
+  fi
+  # 起動直後の未 focus pane には、指示が成功を装わずに消えることがある（herdr #4537、0.9.3 macOS でも再現）。
+  # transcript がまだ無い = Claude Code が一度もメッセージを処理していないので、1 回だけ送り直しても二重にならない
+  if ((RETRY_UNSEEN)) && [[ "$(agent_field '.agent')" == claude && -z "$(transcript_path "$pane")" ]] &&
+     ! screen_tail "$pane" | grep -q '\[Pasted text #'; then
+    sleep "$RETRY_WAIT_S"
+    if "$HERDR" agent prompt "$pane" "$text" --wait --until working --until blocked \
+         --timeout 30000 >/dev/null 2>&1; then
+      emit landed via=retry; exit 0
+    fi
   fi
   if screen_tail "$pane" | grep -q '\[Pasted text #'; then
     # Enter は押さない: blocked の検出は描画から 0.3 秒ほど遅れ、承認 dialog を押しうる（herdr #4764）

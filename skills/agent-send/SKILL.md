@@ -26,6 +26,9 @@ ${CLAUDE_SKILL_DIR}/agent-send.sh prompt <target> --file packet.md   # または
   指示は queue に入って同じ turn に吸収され、届いたことを証明できない
 - 本文は 1 回しか送らない。失敗しても再送しない — `timeout` や `stalled` は「届いていない」の
   証拠にならず、再送は二重送信になる
+- 例外は `--retry-unseen`（spawn.sh が最初の指示に付ける）。起動直後の未 focus の pane では、指示が
+  成功を装わずに消えることがある（herdr #4537。2026-10-10 に 0.9.3 の macOS で 2 回中 1 回）。宛先が
+  Claude Code で transcript がまだ無い（一度もメッセージを処理していない）ときに限り、1 回だけ送り直す
 
 | stdout の `result=` | exit | 意味と次の手 |
 |---|---|---|

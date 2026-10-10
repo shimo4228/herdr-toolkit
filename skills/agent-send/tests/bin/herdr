@@ -46,6 +46,10 @@ case "$1 ${2:-}" in
     ;;
   "agent prompt")
     reply=$(val prompt_reply ok)
+    # prompt_reply_seq: 1 回目以降の応答を 1 行ずつ消費する（再送の試験用）
+    if [[ -s "$S/prompt_reply_seq" ]]; then
+      reply=$(head -1 "$S/prompt_reply_seq"); tail -n +2 "$S/prompt_reply_seq" > "$S/prs.tmp"; mv "$S/prs.tmp" "$S/prompt_reply_seq"
+    fi
     [[ -f "$S/status_after" ]] && cp "$S/status_after" "$S/status"
     [[ -f "$S/seq_after" ]] && cp "$S/seq_after" "$S/seq"
     [[ -f "$S/claude_agents_after" ]] && cp "$S/claude_agents_after" "$S/claude_agents.json"
