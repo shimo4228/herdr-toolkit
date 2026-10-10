@@ -48,7 +48,7 @@ Herdr は turn を追跡せず、agent の状態（working・idle・done・block
 /plugin install herdr-toolkit@herdr-toolkit
 ```
 
-現行バージョンは v2.1.0 です。内容は [CHANGELOG.md](CHANGELOG.md) を参照してください。自前の marketplace なので更新は自動では届きません。セッション内で `/plugin marketplace update herdr-toolkit`、または shell で `claude plugin update herdr-toolkit@herdr-toolkit` を実行してください。
+現行バージョンは v2.1.1 です。内容は [CHANGELOG.md](CHANGELOG.md) を参照してください。自前の marketplace なので更新は自動では届きません。セッション内で `/plugin marketplace update herdr-toolkit`、または shell で `claude plugin update herdr-toolkit@herdr-toolkit` を実行してください。
 
 ## 補足
 
@@ -58,7 +58,7 @@ Herdr は turn を追跡せず、agent の状態（working・idle・done・block
 <details>
 <summary>ツールと AI アシスタント向けの資料</summary>
 
-herdr-toolkit は、Claude Code などの coding agent を Herdr の pane で動かす人向けの Claude Code plugin です。Herdr は turn を追跡しないので、`herdr agent prompt --wait` だけでは長い作業と届かなかった指示を見分けられません。2 つのスキルは、これを結果の行と exit code に変えるためにあります。構成は bash・`jq`・Herdr 0.9.x・Claude Code 2.1.x で、現行は v2.1.0（MIT）です。
+herdr-toolkit は、Claude Code などの coding agent を Herdr の pane で動かす人向けの Claude Code plugin です。Herdr は turn を追跡しないので、`herdr agent prompt --wait` だけでは長い作業と届かなかった指示を見分けられません。2 つのスキルは、これを結果の行と exit code に変えるためにあります。構成は bash・`jq`・Herdr 0.9.x・Claude Code 2.1.x で、現行は v2.1.1（MIT）です。
 
 例を 1 つ示します。
 

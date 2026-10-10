@@ -1,7 +1,7 @@
 {
   "name": "herdr-toolkit",
   "description": "Operating skills for Claude Code on the Herdr agent multiplexer: spawn detached Remote Control sessions into Herdr panes (spawn-session), and send prompts to agents in Herdr panes with landing confirmation and a completion wait (agent-send). The herdr CLI skill itself is not bundled: get it with `herdr --skill`.",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "author": {
     "name": "shimo4228",
     "url": "https://github.com/shimo4228"

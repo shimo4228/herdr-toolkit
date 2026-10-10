@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.1 — 2026-10-10
+
+### Fixed
+
+- `spawn-session --prompt-file` resends the first prompt once when it vanished
+  without a trace: on Herdr 0.9.3 (macOS) a prompt to a freshly started,
+  never-focused pane was lost in 1 of 6 runs, the same pattern as herdr #4537.
+  agent-send's new `--retry-unseen` resends only while the Claude Code session
+  has no transcript yet, so it has not processed any message and a resend
+  cannot double-submit.
+
 ## 2.1.0 — 2026-10-10
 
 ### Added

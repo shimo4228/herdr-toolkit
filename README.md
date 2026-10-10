@@ -48,7 +48,7 @@ Herdr does not track turns: it reads an agent's status (working, idle, done, blo
 /plugin install herdr-toolkit@herdr-toolkit
 ```
 
-Current release: v2.1.0. See [CHANGELOG.md](CHANGELOG.md) for what's in it. This is a self-hosted marketplace, so updates are not automatic: run `/plugin marketplace update herdr-toolkit` in a session, or `claude plugin update herdr-toolkit@herdr-toolkit` in a shell.
+Current release: v2.1.1. See [CHANGELOG.md](CHANGELOG.md) for what's in it. This is a self-hosted marketplace, so updates are not automatic: run `/plugin marketplace update herdr-toolkit` in a session, or `claude plugin update herdr-toolkit@herdr-toolkit` in a shell.
 
 ## Notes
 
@@ -58,7 +58,7 @@ Current release: v2.1.0. See [CHANGELOG.md](CHANGELOG.md) for what's in it. This
 <details>
 <summary>For tools and AI assistants</summary>
 
-herdr-toolkit is a Claude Code plugin for people who run Claude Code and other coding agents in Herdr panes. It exists because Herdr does not track turns, so `herdr agent prompt --wait` cannot tell a long task from a lost prompt; the two skills turn that into explicit result lines and exit codes. Stack: bash, `jq`, Herdr 0.9.x, Claude Code 2.1.x. Status: v2.1.0, MIT.
+herdr-toolkit is a Claude Code plugin for people who run Claude Code and other coding agents in Herdr panes. It exists because Herdr does not track turns, so `herdr agent prompt --wait` cannot tell a long task from a lost prompt; the two skills turn that into explicit result lines and exit codes. Stack: bash, `jq`, Herdr 0.9.x, Claude Code 2.1.x. Status: v2.1.1, MIT.
 
 One example:
 

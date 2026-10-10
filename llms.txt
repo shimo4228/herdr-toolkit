@@ -16,7 +16,7 @@
 
 ## Plugin manifests
 
-- [plugin.json](.claude-plugin/plugin.json): Claude Code plugin manifest (v2.1.0, MIT)
+- [plugin.json](.claude-plugin/plugin.json): Claude Code plugin manifest (v2.1.1, MIT)
 - [marketplace.json](.claude-plugin/marketplace.json): self-owned marketplace pointing at this repo
 
 ## Design records
