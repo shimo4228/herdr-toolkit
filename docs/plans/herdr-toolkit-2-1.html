@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>herdr-toolkit 2.1</title>
+<link rel="stylesheet" href="htmlplan.css">
+<script src="htmlplan.js" defer></script>
+<body>
+
+<header>
+  <h1>herdr-toolkit 2.1 の agent 送信と起動</h1>
+  <doc-changes new="10" changed="16"></doc-changes>
+  <details class="thread"><summary>Why · 3 件の依頼</summary>
+    <doc-quote via="prompt" from="著者">Herdr-delegateを廃止したからこのプラグインがちょっとツールが少なすぎるんだけど、現状の使い方でどう整理すべきかな？</doc-quote>
+    <doc-quote via="prompt" from="著者">じゃあ実装してプラグインのバージョンリリースするところまでプランして。あと、わたしのセッション履歴を走査してHerdr仕様のボトルネックとなっているところがあれば、そこも解消できる内容も盛り込んで</doc-quote>
+    <doc-quote via="prompt" from="著者">herdrスキルなんだけど、あれ元々Hunkとかと同じでシンボリックリンクじゃなかったっけ？</doc-quote>
+    <p>調査: <a href="research/2026-10-10-herdr-session-bottlenecks.md">内部 report（履歴 1,704 回の集計）</a> · <a href="research/2026-10-10-herdr-toolkit-next.md">外部 report（Herdr 0.9.3・plugin 仕様・Claude Code）</a></p>
+  </details>
+</header>
+
+<main>
+<doc-plan>
+
+<!-- ═════ 1 · 送信 ═════ -->
+<doc-claim>
+  <p>prompt を送ると、届いたかが 1 行で返る。</p>
+  <doc-mock frame="terminal" title="agent-send" w="480"><template><span class="dim">$</span> agent-send.sh prompt AAP/release --file packet.md
+<span class="g">result=landed</span> pane=w12:p5 agent=claude status=working <span data-ref="via1">via=working</span>
+<span class="dim">$</span> agent-send.sh prompt w3F:p2 --file kickoff.md
+<span class="g">result=landed</span> pane=w3F:p2 agent=claude status=idle <span data-ref="via2">via=transcript</span>
+<span class="dim">$</span> agent-send.sh prompt triage-ca --text "cycle"
+<span class="y" data-ref="busy">result=busy</span> pane=w41:p1W status=working waited_ms=600000
+<span class="dim">(exit 4)</span></template>
+    <doc-pin ref="via1" anchor="r" title="turn の開始を見た">--until working の観測で着弾とする。</doc-pin>
+    <doc-pin ref="via2" anchor="tr" title="transcript で確かめた">stalled でも、宛先の transcript に user turn が出ていれば着弾。</doc-pin>
+    <doc-pin ref="busy" anchor="tl" title="作業中には送らない">送ると queue に入り、着弾を証明できない。queue の取りこぼし（#85603）も避ける。</doc-pin>
+  </doc-mock>
+  <doc-ask id="place">
+    <p>agent-send をどこに置くか。</p>
+    <label><input type="radio" name="place" value="skill" checked> 新しい skill <code>agent-send</code>（plugin の 2 本目） <small>Codex pane と既存 session にも使える</small></label>
+    <label><input type="radio" name="place" value="inside"> spawn-session の中の script <small>skill は 1 本のまま。claim 1 と 2 は spawn-session の節になる</small></label>
+  </doc-ask>
+
+  <doc-claim>
+    <p>着弾は turn の開始（working）で判定する。</p>
+    <doc-calls title="prompt の流れ" caption="triage-tick.sh の submit が 28 回で失敗 0 の先例。">
+<script type="text/plain">
++ **cmd_prompt**(target, text)                              @ skills/agent-send/agent-send.sh:40
++   **preflight**()                                         @ skills/agent-send/agent-send.sh:20   -- claim 4
++   **resolve_pane**(target)                                @ skills/agent-send/agent-send.sh:28   -- claim 1.3
++   herdr agent wait pane --until idle --until done          -- working の相手は待つ
++   herdr agent prompt pane --wait --until working --until blocked
++   **confirm_landing**(pane, seq0)                         @ skills/agent-send/agent-send.sh:70   -- stalled か timeout のとき
+
+  submit()                                                  @ scripts/triage-tick.sh:153   -- --until working の先例
+</script>
+    </doc-calls>
+    <doc-claim at="skills/agent-send/agent-send.sh:40">
+      <p><b>agent-send.sh:40</b> · cmd_prompt()</p>
+      <doc-code title="agent-send.sh · sketch" lang="bash" hl="11-12">
+<script type="text/plain">
+cmd_prompt() {
+  preflight || exit 5
+  pane=$(resolve_pane "$TARGET") || { emit not_found; exit 2; }
+  case $(status_of "$pane") in
+    blocked) emit blocked; exit 3 ;;
+    working) herdr agent wait "$pane" --until idle --until done --until blocked \
+               --timeout "$BUSY_MS" >/dev/null || { emit busy; exit 4; } ;;
+  esac
+  seq0=$(seq_of "$pane")             # state_change_seq を控える
+  if herdr agent prompt "$pane" "$TEXT" \
+       --wait --until working --until blocked --timeout "$TIMEOUT_MS" >/dev/null 2>&1; then
+    [[ $(status_of "$pane") == blocked ]] && { emit blocked; exit 3; }
+    emit landed via=working; exit 0
+  fi
+  confirm_landing "$pane" "$seq0"    # 本文は再送しない
+}
+</script>
+        <doc-pin line="11" tone="ok" title="turn の開始で返る">--wait だけだと turn の完了まで待ち、123 件が timeout になった。</doc-pin>
+      </doc-code>
+    </doc-claim>
+  </doc-claim>
+
+  <doc-claim>
+    <p>stalled と timeout は、本文を再送せずに確かめる。</p>
+    <doc-code title="agent-send.sh · sketch" lang="bash">
+<script type="text/plain">
+confirm_landing() {                  # stalled / timeout のあと
+  local pane=$1 seq0=$2
+  if [[ $(seq_of "$pane") != "$seq0" ]]; then
+    emit landed via=seq; exit 0      # 状態は動いた。turn は始まっている
+  fi
+  if [[ $(status_of "$pane") == working ]]; then # Claude は Claude Code 自身の状態
+    emit landed via=status; exit 0
+  fi
+  if transcript_has_text "$pane" "$TEXT"; then   # Claude: agent_session = session ID
+    emit landed via=transcript; exit 0
+  fi
+  if screen_tail "$pane" | grep -q '\[Pasted text #'; then
+    emit typed; screen_tail "$pane" >&2; exit 2  # 入力欄に残った。Enter は押さない
+  fi
+  [[ $TEXT == /* ]] && { emit accepted via=command; exit 0; }   # /effort は turn を起こさない
+  emit no_evidence; screen_tail "$pane" >&2; exit 2
+}
+</script>
+      <doc-pin line="6" tone="ok" title="画面でなく報告を見る">claim 2.1 の status_of()。</doc-pin>
+      <doc-pin line="9" tone="ok" title="受理の証拠">agent_session の値は transcript のファイル名と同じ（2026-10-10 確認）。</doc-pin>
+      <doc-pin line="12" tone="info" title="v0.8.0 #1878 と v0.9.0 #3506 で減った型">Enter 押し直しは 7〜8 月 21 回、9〜10 月 2 回。</doc-pin>
+      <doc-pin line="15" tone="warn" title="slash command は working にならない">/effort を送った 3 回は 3 回とも stalled だった。</doc-pin>
+    </doc-code>
+    <doc-ask id="enter">
+      <p>入力欄に貼った本文が残ったら、Enter を押すか。</p>
+      <label><input type="radio" name="enter" value="never" checked> 押さずに typed で返す <small>呼び出し側が画面を見て決める</small></label>
+      <label><input type="radio" name="enter" value="guarded"> dialog が無いことを確かめて 1 回押す <small>blocked 検出は 0.3 秒遅れ、承認を押す恐れ（#4764）</small></label>
+    </doc-ask>
+  </doc-claim>
+
+  <doc-claim>
+    <p>宛先は pane ID に固定し、表示名でも引ける。</p>
+    <doc-code title="agent-send.sh · sketch" lang="bash">
+<script type="text/plain">
+resolve_pane() {                     # agent 名・pane ID・表示名 → pane ID
+  local t=$1 p
+  p=$(herdr agent list | jq -r --arg t "$t" '
+        [.result.agents[] | select(.name == $t or .pane_id == $t) | .pane_id] | first // empty')
+  [[ -n $p ]] && { echo "$p"; return 0; }
+  # 表示名は tab の label（spawn.sh が付ける "AAP/release" など）
+  p=$(herdr workspace list | jq -r '.result.workspaces[].workspace_id' |
+      while read -r ws; do
+        herdr pane list --workspace "$ws" | jq -r --arg t "$t" --argjson tabs \
+          "$(herdr tab list --workspace "$ws" | jq '[.result.tabs[] | select(.label == $t) | .tab_id]')" \
+          '.result.panes[] | select(.tab_id as $x | $tabs | index($x)) | .pane_id'
+      done | head -1)
+  [[ -n $p ]] && echo "$p"
+}
+</script>
+      <doc-pin line="1" tone="info" title="名前の取り違え 14 件">表示名を agent 名として渡した agent_not_found。</doc-pin>
+      <doc-pin line="5" tone="info" title="以後は pane ID で呼ぶ">名前宛は agent 終了直後に別の occupant へ届きうる（#4764）。</doc-pin>
+    </doc-code>
+  </doc-claim>
+</doc-claim>
+
+<!-- ═════ 2 · 完了 ═════ -->
+<doc-claim>
+  <p>作業の終わりを、1 本のコマンドで待てる。</p>
+  <doc-machine name="wait" caption="settled を続けて観測し、成果物の条件も真なら完了。Claude の状態は Claude Code 自身の報告を使う。">
+<script type="text/plain">
+machine wait initial working
+state working         # turn が走っている
+state settling        # idle か done を観測した。回数を数える
+state done     final  # 3 回続き、--done-if も真。exit 0
+state blocked  final  # 承認か質問で止まった。exit 3
+state timeout  final  # 期限切れ。exit 4
+
+| working | settling | done |
+| blocked | timeout  | .    |
+
+working  -settle->   settling : idle/done
+settling -flap->     working  : working
+settling -ok->       done     : 3 回 + done-if
+working  -dialog->   blocked  : blocked
+settling -dialog->   blocked  : blocked
+working  -deadline-> timeout  : --timeout
+settling -deadline-> timeout  : --timeout
+</script>
+    <div data-state="working"><doc-mock frame="terminal" w="440"><template><span class="dim">（background で待機中。出力はまだ無い）</span></template></doc-mock></div>
+    <div data-state="settling"><doc-mock frame="terminal" w="440"><template><span class="dim">（idle を 1 回観測。偽 idle の揺れを見るため、あと 2 回待つ）</span></template></doc-mock></div>
+    <div data-state="done"><doc-mock frame="terminal" w="440"><template><span class="g">result=done</span> pane=w12:p5 status=idle settled=3 done_if=true</template></doc-mock></div>
+    <div data-state="blocked"><doc-mock frame="terminal" w="440"><template><span class="r">result=blocked</span> pane=w12:p5 status=blocked
+<span class="dim">（画面の末尾 15 行を stderr に出す。人間に渡す）</span></template></doc-mock></div>
+    <div data-state="timeout"><doc-mock frame="terminal" w="440"><template><span class="y">result=timeout</span> pane=w12:p5 status=working waited_ms=3600000</template></doc-mock></div>
+  </doc-machine>
+
+  <doc-claim>
+    <p>Claude の状態は、画面でなく Claude Code の報告で読む。</p>
+    <doc-code title="agent-send.sh · sketch" lang="bash">
+<script type="text/plain">
+status_of() {                        # pane → idle | working | blocked
+  local pane=$1 kind sid
+  read -r kind sid < <(herdr agent get "$pane" |
+    jq -r '.result.agent | "\(.agent) \(.agent_session.value // "")"')
+  if [[ $kind == claude && -n $sid ]]; then
+    case $(claude agents --json </dev/null 2>/dev/null |
+           jq -r --arg s "$sid" '.[] | select(.sessionId == $s) | .status') in
+      busy)    echo working; return ;;
+      waiting) echo blocked; return ;;
+      idle)    echo idle;    return ;;
+    esac                             # 見つからなければ Herdr の状態に戻る
+  fi
+  herdr agent get "$pane" | jq -r '.result.agent.agent_status'
+}
+</script>
+      <doc-pin line="5" tone="ok" title="同じ ID">Herdr の agent_session と Claude の sessionId は一致（2026-10-10 確認）。</doc-pin>
+      <doc-pin line="6" tone="ok" title="Claude Code 自身の報告">対話 session にも status が付く。1 回 0.2 秒。</doc-pin>
+      <doc-pin line="9" tone="warn" title="Phase 0 で確かめる">waiting が承認待ちを指すか、背景 subagent 中も busy か。</doc-pin>
+      <doc-pin line="13" tone="info" title="Codex は Herdr の画面検出">偽 idle の open issue（#5004 ほか）は残る。</doc-pin>
+    </doc-code>
+  </doc-claim>
+
+  <doc-claim>
+    <p>settled が続き、成果物の条件も真で完了とする。</p>
+    <doc-code title="agent-send.sh · sketch" lang="bash" hl="12">
+<script type="text/plain">
+cmd_wait() {
+  pane=$(resolve_pane "$TARGET") || { emit not_found; exit 2; }
+  local settled=0 deadline=$((SECONDS + TIMEOUT_MS / 1000))
+  while (( SECONDS < deadline )); do
+    herdr agent wait "$pane" --until idle --until done --until blocked \
+      --timeout "$STEP_MS" >/dev/null 2>&1          # sleep でなく server 側で待つ
+    case $(status_of "$pane") in
+      blocked)   emit blocked; exit 3 ;;
+      idle|done) settled=$((settled + 1)) ;;
+      *)         settled=0 ;;
+    esac
+    if (( settled >= SETTLE_N )) && done_if_ok; then
+      emit done settled="$settled"; exit 0
+    fi
+    sleep "$GAP_S"                   # 偽 idle の揺れ（#5004）を観測の間隔でならす
+  done
+  emit timeout; exit 4
+}
+</script>
+      <doc-pin line="12" tone="ok" title="成果物で確かめる">例: --done-if 'git -C wt log -1 --format=%s | grep -q task'</doc-pin>
+    </doc-code>
+    <doc-ask id="signal">
+      <p>完了の信号に何を使うか。</p>
+      <label><input type="radio" name="signal" value="settle" checked> 状態の settle と --done-if <small>hook を足さない。Claude は 2 回、Codex は 3 回続けて見る</small></label>
+      <label><input type="radio" name="signal" value="hook"> 上に加え、Claude の Stop hook で終わりを記録する <small>background_tasks が空の Stop だけ完了。hook が増え、Codex には効かない</small></label>
+    </doc-ask>
+  </doc-claim>
+
+  <doc-claim>
+    <p>待ちは background で走らせ、終わりは通知で知る。</p>
+    <doc-code title="skills/agent-send/SKILL.md · sketch" lang="markdown">
+<script type="text/plain">
+## 完了を待つ
+
+`agent-send.sh wait` は Bash tool の `run_in_background: true` で起動する。
+終わると通知が届くので、その間に画面を読みに行かない。
+
+    ${CLAUDE_SKILL_DIR}/agent-send.sh wait <target> --timeout 3600000 \
+      --done-if 'git -C <worktree> log -1 --format=%s | grep -q "<task>"'
+
+- exit 0: 成果物を読む
+- exit 3: 承認か質問で止まった。画面を読み、人間に渡す
+- exit 4: 期限切れ。画面と成果物を見て、延長か打ち切りを決める
+</script>
+      <doc-pin line="3" tone="info" title="polling を context から外す">sleep 入りの確認 176 回、Bash の 2 分 timeout 8 回。</doc-pin>
+    </doc-code>
+  </doc-claim>
+</doc-claim>
+
+<!-- ═════ 3 · 起動 ═════ -->
+<doc-claim>
+  <p>spawn-session は、起動と最初の指示を 1 回で渡せる。</p>
+  <doc-mock frame="terminal" title="spawn-session" w="480"><template><span class="dim">$</span> spawn.sh ~/MyAI_Lab/agent-attribution-practice "AAP/release" \
+    --model opus <span data-ref="flags">--effort high --permission-mode plan</span> \
+    <span data-ref="pf">--prompt-file packet.md</span>
+<span class="g">✅</span> Remote Control session started: "AAP/release"
+   herdr: workspace w12 / tab w12:t3 / pane w12:p5
+   agent: aap-release-48211
+   <span class="g" data-ref="res">prompt: result=landed pane=w12:p5 status=working</span></template>
+    <doc-pin ref="flags" anchor="tr" title="起動の引数で渡す">/effort の送信と plan mode の kickoff が要らなくなる。</doc-pin>
+    <doc-pin ref="pf" anchor="r" title="最初の指示も同じ呼び出し">中で agent-send.sh prompt を使う。</doc-pin>
+    <doc-pin ref="res" anchor="br" title="着弾の結果を足す">claim 1 と同じ 1 行。</doc-pin>
+  </doc-mock>
+
+  <doc-claim>
+    <p>effort と permission mode は、起動の引数で渡す。</p>
+    <doc-code title="spawn.sh" lang="bash" diff file="skills/spawn-session/spawn.sh">
+<script type="text/plain">
+@@ -42,18 +42,30 @@
+ NAME="$(basename "$PROJECT")"                        # 表示名の既定はディレクトリ名
+ MODEL=""
++EFFORT="" PMODE="" PROMPT_FILE=""
+ shift
+ while [[ $# -gt 0 ]]; do                             # 2 つ目の位置引数 = 表示名、--model は任意
+   case "$1" in
+     --model)
+       [[ -n "${2:-}" ]] || { printf 'spawn.sh: --model needs a value\n' >&2; exit 64; }
+       MODEL="$2"; shift ;;
+     --model=*) MODEL="${1#--model=}" ;;
++    --effort) EFFORT="${2:-}"; shift ;;
++    --permission-mode) PMODE="${2:-}"; shift ;;
++    --prompt-file) PROMPT_FILE="${2:-}"; shift ;;
+     --*) printf 'spawn.sh: unknown option %s\n' "$1" >&2; exit 64 ;;
+     *) NAME="$1" ;;
+   esac
+   shift
+ done
+ NAME="${NAME//[\"\']/}"                              # 後段で pane のシェルへ打鍵するためクォート文字は除去
+ [[ "$MODEL" =~ ^[A-Za-z0-9._-]*$ ]] || { printf 'spawn.sh: bad --model value\n' >&2; exit 64; }
++[[ "$EFFORT" =~ ^(|low|medium|high|xhigh|max)$ ]] ||
++  { printf 'spawn.sh: bad --effort\n' >&2; exit 64; }
++[[ "$PMODE" =~ ^(|manual|acceptEdits|auto|dontAsk|plan)$ ]] ||
++  { printf 'spawn.sh: bad --permission-mode\n' >&2; exit 64; }
++[[ -z "$PROMPT_FILE" || -f "$PROMPT_FILE" ]] ||
++  { printf 'spawn.sh: no such file: %s\n' "$PROMPT_FILE" >&2; exit 64; }
+ CLAUDE_ARGS=(--remote-control "$NAME")
+ [[ -n "$MODEL" ]] && CLAUDE_ARGS+=(--model "$MODEL")
++[[ -n "$EFFORT" ]] && CLAUDE_ARGS+=(--effort "$EFFORT")
++[[ -n "$PMODE" ]] && CLAUDE_ARGS+=(--permission-mode "$PMODE")
+</script>
+      <doc-pin line="64" tone="warn" title="bypassPermissions は受けない">phone から起こす session の権限を広げない。</doc-pin>
+    </doc-code>
+  </doc-claim>
+
+  <doc-claim>
+    <p>最初の指示は agent-send で送り、結果を出力に足す。</p>
+    <doc-calls title="spawn.sh の流れ" caption="agent-send は兄弟 skill のディレクトリから呼ぶ。">
+<script type="text/plain">
+~ spawn.sh dir name [--prompt-file F]                       @ skills/spawn-session/spawn.sh:22
++   ../agent-send/agent-send.sh preflight                   @ skills/spawn-session/spawn.sh:61   -- claim 4
+    herdr agent start name --kind claude -- CLAUDE_ARGS      @ skills/spawn-session/spawn.sh:152
++   ../agent-send/agent-send.sh prompt pane --file F        @ skills/spawn-session/spawn.sh:164  -- claim 1
++   printf '   prompt: %s' result                           @ skills/spawn-session/spawn.sh:164
+</script>
+    </doc-calls>
+  </doc-claim>
+
+  <doc-claim>
+    <p>trust の確認で止まったら、理由と agent 名を返す。</p>
+    <doc-code title="spawn.sh" lang="bash" diff file="skills/spawn-session/spawn.sh">
+<script type="text/plain">
+@@ -165,8 +165,12 @@
+ else
+   printf '   ⚠️  claude が起動 or idle に到達しませんでした。\n' >&2
+   [[ -n "${err:-}" ]] && printf '   herdr error: %s\n' "$err" >&2
++  printf '   agent: %s   ← agent read / send-keys に使える\n' "$AGENT_NAME" >&2
++  screen=$("$HERDR_BIN" pane read "$PANE_ID" --source recent-unwrapped --lines 40 2>/dev/null || true)
++  grep -q 'trust' <<<"$screen" &&
++    printf '   原因: workspace trust の確認で停止。Mac でこの repo を一度開くと通る\n' >&2
+   printf '   pane の直近出力:\n' >&2
+-  "$HERDR_BIN" pane read "$PANE_ID" --source recent-unwrapped --lines 40 >&2 || true
++  printf '%s\n' "$screen" >&2
+   printf '   (典型原因: auth 切れ → Mac 側で要再ログイン / claude が PATH に無い)\n' >&2
+   exit 1
+ fi
+</script>
+      <doc-pin line="170" tone="info" title="2026-09-08 の実例">初回 spawn が trust の確認で agent_not_ready になった。</doc-pin>
+    </doc-code>
+  </doc-claim>
+
+  <doc-claim>
+    <p>spawn-session の理由を、Herdr pane で操れる起動に言い直す。</p>
+    <doc-code src="skills/spawn-session/SKILL.md" lines="10-28" wrap>
+      <doc-pin line="14" tone="warn" title="phone からの起動">Week 34 から、device card で directory を選んで起こせる見込み。</doc-pin>
+      <doc-pin line="23" tone="info" title="Dispatch は限定 beta">新規ユーザーは使えない（support 記事）。</doc-pin>
+      <doc-pin line="28" tone="risk" title="cwd の壁の主張">2026-08-01 の確認。device card の実測で書き直す。</doc-pin>
+    </doc-code>
+    <doc-note tone="warn"><strong>著者の実測</strong> Mac で <code>claude remote-control</code> を動かし、iPhone の Code タブの device card で選べる folder の範囲を確かめてください。結果に合わせて、spawn-session の主な用途を「session や script から Herdr pane に起こし、agent-send で操る」に寄せます。</doc-note>
+  </doc-claim>
+</doc-claim>
+
+<!-- ═════ 4 · 版ずれ ═════ -->
+<doc-claim>
+  <p>Herdr の版がずれていたら、送る前に知らせる。</p>
+  <doc-mock frame="terminal" title="preflight" w="480"><template><span class="dim">$</span> agent-send.sh preflight
+<span class="y" data-ref="stale">warn=server_binary_stale</span> server=0.9.1 client=0.9.3
+  → pane が全部 idle のときに: herdr server stop → herdr を開き直す
+<span class="y" data-ref="drift">warn=skill_drift</span> file=~/.claude/skills/herdr/SKILL.md
+  → herdr --skill の出力で置き換える（origin 行は残す）
+<span class="g">result=ok</span></template>
+    <doc-pin ref="stale" anchor="tr" title="今の状態">2026-10-10 の server は 0.9.1、client は 0.9.3。</doc-pin>
+    <doc-pin ref="drift" anchor="br" title="symlink にできない">brew の herdr はファイルを持たず、--skill で出す。</doc-pin>
+  </doc-mock>
+
+  <doc-claim>
+    <p>互換が無ければ止め、古いだけなら警告する。</p>
+    <doc-code title="agent-send.sh · sketch" lang="bash">
+<script type="text/plain">
+preflight() {
+  local s; s=$(herdr status --json 2>/dev/null) || { emit herdr_unreachable; return 1; }
+  [[ $(jq -r '.server.running' <<<"$s") == true ]] || { emit server_down; return 1; }
+  if [[ $(jq -r '.server.compatible and .server.endpoint_compatible' <<<"$s") != true ]]; then
+    emit incompatible
+    echo '  → pane が全部 idle のときに: herdr server stop → herdr を開き直す' >&2
+    return 1
+  fi
+  ver_ge "$(jq -r .server.version <<<"$s")" 0.9.0 ||
+    { emit server_too_old; return 1; }   # --wait の意味は 0.9.0 で変わった
+  if [[ $(jq -r '.update.server_binary_stale or .update.restart_needed' <<<"$s") == true ]]; then
+    printf 'warn=server_binary_stale server=%s client=%s\n' \
+      "$(jq -r .server.version <<<"$s")" "$(jq -r .client.version <<<"$s")" >&2
+  fi
+  skill_drift_warn
+}
+</script>
+      <doc-pin line="4" tone="risk" title="0.8.0 で CLI が全滅した型">client だけ上がり compatible: no になった。</doc-pin>
+      <doc-pin line="6" tone="info" title="live-handoff は 0.9.3 に無い">brew 版では herdr update --handoff も使えない。</doc-pin>
+      <doc-pin line="9" tone="warn" title="下限の版">0.9.0 から、--wait は working か blocked の観測を要する。</doc-pin>
+    </doc-code>
+  </doc-claim>
+
+  <doc-claim>
+    <p>herdr skill のコピーが古ければ、警告だけ出す。</p>
+    <doc-code title="agent-send.sh · sketch" lang="bash">
+<script type="text/plain">
+skill_drift_warn() {                 # ファイルは書かない
+  local f="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/herdr/SKILL.md"
+  [[ -f $f && ! -L $f ]] || return 0
+  if ! diff -q <(grep -v '^origin:' "$f") <(herdr --skill 2>/dev/null) >/dev/null; then
+    printf 'warn=skill_drift file=%s\n' "$f" >&2
+    printf '  → herdr --skill の出力で置き換える（origin 行は残す）\n' >&2
+  fi
+}
+</script>
+      <doc-pin line="3" tone="info" title="symlink なら見ない">Hunk のように link 先が版を持つ場合。</doc-pin>
+    </doc-code>
+  </doc-claim>
+</doc-claim>
+
+<!-- ═════ 5 · 揃える・公開 ═════ -->
+<doc-claim>
+  <p>ハーネスの 4 か所と公開 repo が、同じ道具に揃う。</p>
+  <doc-calls title="置き換える呼び出し" caption="rule の行は著者の diff として見せてから commit する。">
+<script type="text/plain">
+~ spawn-session step 5                     @ skills/spawn-session/SKILL.md:65    -- --wait 180000 → agent-send.sh prompt
+~ task-triage の local dispatch            @ skills/task-triage/SKILL.md:209     -- /effort の送信 → spawn.sh --effort
+~ task-triage の bounce                    @ skills/task-triage/SKILL.md:253     -- herdr agent prompt → agent-send.sh prompt
+~ triage-tick.sh の submit()               @ scripts/triage-tick.sh:153          -- agent-send.sh prompt に置き換え
+~ mono-figure の Codex 経路                @ skills/mono-figure/SKILL.md:82      -- prompt と wait --done-if（出力ファイル）
+~ agents.md の着弾の記述                    @ rules/common/agents.md:10           -- 「settled は着弾確認まで」を改める
+</script>
+  </doc-calls>
+
+  <doc-claim>
+    <p>spawn-session の観測は、0.9.3 で再現したものだけ残す。</p>
+    <doc-code src="skills/spawn-session/SKILL.md" lines="59-81">
+      <doc-pin line="60" tone="warn" title="再検証する">未 focus の新しい pane への初回 prompt（#4537）を 0.9.3 で試す。</doc-pin>
+      <doc-pin line="65" tone="risk" title="timeout 123 件の主因">--wait は turn の完了まで待つ。agent-send に置き換える。</doc-pin>
+      <doc-pin line="76" tone="info" title="消す見込み">Enter 残りは v0.8.0 #1878 と v0.9.0 #3506 で対策済み。</doc-pin>
+    </doc-code>
+    <doc-note tone="warn"><strong>実機確認</strong> 稼働中の server は 0.9.1 です。0.9.3 で確かめるには server の再起動が要り、他の session の turn が止まります。再起動の時刻は著者が決めます。</doc-note>
+  </doc-claim>
+
+  <doc-claim>
+    <p>README は、着弾確認の理由を 0.9.3 の事実で書き直す。</p>
+    <doc-code src="README.md" lines="26-38">
+      <doc-pin line="30" tone="warn" title="古い観測">v0.7.5 期の空レスポンス。0.8.0 以降の対策を書く。</doc-pin>
+      <doc-pin line="32" tone="warn" title="理由を正す">公式には queue に入る。落ちるのは open bug（#85603）。</doc-pin>
+      <doc-pin line="36" tone="warn" title="版と link">Built against 0.9.3。org は herdrdev/herdr に移った。</doc-pin>
+    </doc-code>
+  </doc-claim>
+
+  <doc-claim>
+    <p>bats は偽の herdr で、送信と待ちの分岐を固定する。</p>
+    <doc-code title="skills/agent-send/tests/agent-send.bats · sketch" lang="bash">
+<script type="text/plain">
+setup() {                            # 偽の herdr を PATH の先頭に置く
+  export PATH="$BATS_TEST_DIRNAME/bin:$PATH" FAKE_STATE="$BATS_TEST_TMPDIR"
+}
+@test "stalled でも seq が動いていれば landed。本文は 1 回だけ送る" {
+  fake_set status=idle seq=7 prompt_reply=stalled seq_after=8
+  run "$SKILL_DIR/agent-send.sh" prompt w1:p1 --text hello
+  [ "$status" -eq 0 ] && [[ $output == *"result=landed"*"via=seq"* ]]
+  [ "$(fake_count prompt)" -eq 1 ]
+}
+@test "blocked の相手には送らない" {
+  fake_set status=blocked
+  run "$SKILL_DIR/agent-send.sh" prompt w1:p1 --text hello
+  [ "$status" -eq 3 ] && [ "$(fake_count prompt)" -eq 0 ]
+}
+@test "idle と working が揺れる間は done にしない" {
+  fake_set status_seq=idle,working,idle,idle,idle
+  run "$SKILL_DIR/agent-send.sh" wait w1:p1 --settle 3 --step 10 --gap 0
+  [ "$status" -eq 0 ] && [ "$(fake_count get)" -ge 5 ]
+}
+</script>
+      <doc-pin line="2" tone="info" title="先例">~/.claude の cloud-dispatch.bats が stub を PATH に置く。</doc-pin>
+    </doc-code>
+  </doc-claim>
+
+  <doc-claim>
+    <p>2.1.0 は、検証を通り、著者の確認を得てから公開する。</p>
+    <doc-flow caption="push と公開だけが著者の確認を待つ。">
+<script type="text/plain">
+h  = ~/.claude で実装
+v  = verify と commit
+s  = sync で repo へ
+r  = repo の verify
++ p = push と公開 [green]
+| h | v |
+| s | r |
+| . | p |
+h -> v : commit 前
+v -> s : 通過
+s -> r : dry-run → apply
+r -> p : 著者の確認
+</script>
+    </doc-flow>
+    <doc-ask id="executor">
+      <p>実行者の決定: どこで実装するか。</p>
+      <label><input type="radio" name="executor" value="here" checked> このセッション（Opus 5.5、build-tier） <small>Herdr の実機と ~/.claude が要る。cloud 不可</small></label>
+      <label><input type="radio" name="executor" value="spawn"> spawn-session で build session を立てて渡す <small>このセッションは packet と検収に残る</small></label>
+    </doc-ask>
+  </doc-claim>
+</doc-claim>
+
+<!-- ═════ shared · not changing ═════ -->
+<doc-claim aux="shared">
+  <p>共有: agent-send の呼び方と返り値。</p>
+  <doc-schema id="contract" lang="sh" title="skills/agent-send/agent-send.sh の契約" caption="stdout は 1 行。呼び出し側は exit code で分岐する。">
+<script type="text/plain">
+# 置き場: skills/agent-send/。SKILL.md からは ${CLAUDE_SKILL_DIR}/agent-send.sh
+agent-send.sh prompt <target> (--text TEXT | --file PATH)
+                     [--timeout MS] [--busy-timeout MS]
+agent-send.sh wait   <target> [--timeout MS] [--settle N]
+                     [--step MS] [--gap S] [--done-if CMD]
+agent-send.sh preflight
+# <target>: agent 名 | pane ID | 表示名（tab の label）
+#           内部で pane ID に固定する
+# stdout:   1 行。result=<語> pane=<id> [via=…] [status=…]
+#           語: landed accepted done ok busy blocked
+#               typed no_evidence not_found timeout
+# stderr:   warn=… の行と、失敗時の画面末尾 15 行
+# exit:     0 landed・accepted・done・ok
+#           2 typed・no_evidence・not_found（証拠なしは失敗）
+#           3 blocked / 4 busy・timeout / 5 preflight / 64 usage
+# 状態:     Claude は claude agents --json の status（sessionId = agent_session）
+#           Codex と他の agent は herdr agent get の agent_status
+# 既定:     prompt --timeout 60000、wait --timeout 3600000
+#           --settle 2（Claude）・3（他）、--step 30000、--gap 30
+</script>
+  </doc-schema>
+</doc-claim>
+
+<doc-claim aux="scope">
+  <p>変えないもの: vendor の herdr skill、委譲の経路、trust の方針。</p>
+  <ul>
+    <li>vendor の <code>herdr</code> skill はコピーのまま置く。差分は警告するだけで、自動では書き換えない。</li>
+    <li>Codex への実装委譲（<code>codex:rescue</code>）と cloud dispatch（<code>cloud-dispatch.sh</code>）。</li>
+    <li><code>triage-tick.sh</code> の launchd・Slack・session 探索。替えるのは submit の部分だけ。</li>
+    <li>workspace trust を自動で通さない方針。<code>~/.claude.json</code> は書かない。</li>
+    <li>Herdr 本体と Remote Control の server mode。upstream への PR は出さない。</li>
+    <li>Claude 同士の送信を SendMessage に切り替えない。Codex に届かず、script から呼べず、承認待ちで 5 分後に消える場合がある。</li>
+  </ul>
+</doc-claim>
+
+</doc-plan>
+</main>
+</body>
+</html>
